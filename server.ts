@@ -10,7 +10,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = Number(process.env.PORT) || 3000;
+
+process.on('uncaughtException', (err) => {
+  console.error('Server uncaughtException:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Server unhandledRejection:', reason);
+});
 
 app.use(express.json());
 
@@ -33,15 +40,19 @@ app.post('/api/ai/chat', async (req, res) => {
     const { messages, coupleNames, venue, date } = req.body;
     if (!ai) {
       return res.status(200).json({
-        reply: `Welcome to the Wedding Concierge! How can I assist you with ${coupleNames || 'Samson & Kevine'}'s wedding celebration at ${venue || 'Lion Voice Tabernacle & Rooftop 39 Salt River Road'}? You can ask me about guest dress codes (Vintage Wear & Gala Wear), the schedule, or Cape Town travel!`
+        reply: `Welcome to the Wedding Concierge! How can I assist you with ${coupleNames || 'Samson & Kevine'}'s wedding celebration in Cape Town? You can ask me about guest dress codes (Vintage Wear & Gala Wear), schedule timings, transport, or children policies!`
       });
     }
 
-    const systemInstruction = `You are the bespoke luxury wedding concierge and stationery stylist representing ${coupleNames || 'Samson Ilunga & Kevine Bonganga'}'s wedding celebration in Cape Town, South Africa on ${date || 'Saturday, 20 March 2027'}.
-Venues:
+    const systemInstruction = `You are the bespoke luxury wedding concierge representing ${coupleNames || 'Samson Ilunga & Kevine Bonganga'}'s wedding celebration in Cape Town, South Africa on ${date || 'Sunday, 20th December 2026'}.
+Venues & Schedule:
 - Wedding Benediction: Lion Voice Tabernacle (11 Lower Maynard Rd Wynberg Station, Tailan Building Basement Hall) at 13:00. Dress code: Vintage Wear. Scripture: "Therefore what God has joined together, let no one separate. — Mark 10:9".
 - Evening Reception: Rooftop, 39 Salt River Road, Salt River, Cape Town from 18:00 to 21:00. Dress code: Gala Wear. Scripture: "I will restore to you the years that the swarming locust has eaten. — Joel 2:25".
-You assist both the couple and wedding guests with gracious etiquette, dress codes (Vintage Wear for Church, Gala Wear for Dining), schedule timings, and travel to Wynberg and Salt River. Always maintain an elegant, warm, and refined editorial tone. Keep answers helpful and concise (under 120 words unless asked for a speech or vows).`;
+Essential Policies:
+- Transport Provision: There will be NO transport provision provided. Guests must arrange their own private vehicles, carpooling, or Uber between Wynberg and Salt River.
+- Children Policy: Only young children aged 0 to 5 years can attend the evening event. Outside arrangements are requested for older children.
+- RSVP Deadline: 1st December 2026.
+Tone: Gracious, refined, welcoming, and concise (under 100 words).`;
 
     // Format chat history
     const history = (messages || []).slice(0, -1).map((m: any) => ({
@@ -251,6 +262,127 @@ Respond in valid JSON format only:
   }
 });
 
+// Helper for default acoustic classical wedding song score
+function getDefaultWeddingSongScore(coupleNames?: string) {
+  return {
+    type: 'web_audio_score',
+    title: `Cape Town Eternal Serenade — ${coupleNames || 'Samson & Kevine'}`,
+    composer: 'Gemini Wedding Harmonizer',
+    tempo: 74,
+    key: 'D Major',
+    vibeDescription: 'An evocative acoustic grand piano overture with ascending harp arpeggios and warm string ensemble.',
+    poeticVerse: '“Therefore what God has joined together, let no one separate.” — Mark 10:9',
+    melodyNotes: [
+      { note: 'D4', freq: 293.66, duration: 0.8, delay: 0.0 },
+      { note: 'F#4', freq: 369.99, duration: 0.8, delay: 0.8 },
+      { note: 'A4', freq: 440.00, duration: 1.2, delay: 1.6 },
+      { note: 'B4', freq: 493.88, duration: 0.8, delay: 2.8 },
+      { note: 'A4', freq: 440.00, duration: 1.2, delay: 3.6 },
+      { note: 'F#4', freq: 369.99, duration: 0.8, delay: 4.8 },
+      { note: 'E4', freq: 329.63, duration: 0.8, delay: 5.6 },
+      { note: 'D4', freq: 293.66, duration: 1.6, delay: 6.4 },
+      { note: 'G4', freq: 392.00, duration: 0.8, delay: 8.0 },
+      { note: 'F#4', freq: 369.99, duration: 0.8, delay: 8.8 },
+      { note: 'E4', freq: 329.63, duration: 0.8, delay: 9.6 },
+      { note: 'A4', freq: 440.00, duration: 1.6, delay: 10.4 },
+      { note: 'D5', freq: 587.33, duration: 1.2, delay: 12.0 },
+      { note: 'C#5', freq: 554.37, duration: 0.8, delay: 13.2 },
+      { note: 'B4', freq: 493.88, duration: 0.8, delay: 14.0 },
+      { note: 'A4', freq: 440.00, duration: 1.2, delay: 14.8 },
+      { note: 'F#4', freq: 369.99, duration: 0.8, delay: 16.0 },
+      { note: 'G4', freq: 392.00, duration: 0.8, delay: 16.8 },
+      { note: 'A4', freq: 440.00, duration: 1.2, delay: 17.6 },
+      { note: 'D4', freq: 293.66, duration: 2.4, delay: 18.8 }
+    ],
+    harmonyChords: [
+      { name: 'D Major', time: 0.0, duration: 3.2, freqs: [146.83, 220.00, 293.66, 369.99] },
+      { name: 'G Major', time: 3.2, duration: 3.2, freqs: [196.00, 246.94, 293.66, 392.00] },
+      { name: 'B Minor', time: 6.4, duration: 3.2, freqs: [123.47, 185.00, 220.00, 293.66] },
+      { name: 'A Major', time: 9.6, duration: 2.4, freqs: [110.00, 164.81, 220.00, 277.18] },
+      { name: 'D Major', time: 12.0, duration: 4.0, freqs: [146.83, 220.00, 293.66, 369.99] },
+      { name: 'G Major', time: 16.0, duration: 2.8, freqs: [196.00, 246.94, 293.66, 392.00] },
+      { name: 'D Major', time: 18.8, duration: 4.2, freqs: [146.83, 220.00, 293.66, 369.99, 440.00] }
+    ]
+  };
+}
+
+// 5. AI Wedding Song Generator (Gemini Lyria & Multi-track Composition)
+app.post('/api/ai/wedding-song', async (req, res) => {
+  try {
+    const { coupleNames, weddingDate, venue } = req.body;
+
+    if (!ai) {
+      return res.json(getDefaultWeddingSongScore(coupleNames));
+    }
+
+    // Compose a bespoke multi-track musical score using Gemini 3.8 Flash
+    const compositionPrompt = `You are an elite royal wedding overture composer. Compose a romantic wedding overture song for Samson Ilunga & Kevine Bonganga's wedding in Cape Town ("Celebration of Love", Sunday, 20th December 2026).
+Theme: "Therefore what God has joined together, let no one separate. — Mark 10:9".
+Respond with a JSON object strictly following this structure:
+{
+  "title": "A romantic title e.g. 'Overture to Eternal Love (Samson & Kevine)'",
+  "tempo": 74,
+  "key": "D Major",
+  "vibeDescription": "A tender, radiant acoustic piano serenade with soft orchestral string harmonics.",
+  "poeticVerse": "Hand in hand beneath the Cape Town sky, a sacred covenant that will never die.",
+  "melodyNotes": [
+    {"note": "D4", "freq": 293.66, "duration": 0.8, "delay": 0.0},
+    {"note": "F#4", "freq": 369.99, "duration": 0.8, "delay": 0.8},
+    {"note": "A4", "freq": 440.00, "duration": 1.2, "delay": 1.6},
+    {"note": "B4", "freq": 493.88, "duration": 0.8, "delay": 2.8},
+    {"note": "A4", "freq": 440.00, "duration": 1.2, "delay": 3.6},
+    {"note": "F#4", "freq": 369.99, "duration": 0.8, "delay": 4.8},
+    {"note": "E4", "freq": 329.63, "duration": 0.8, "delay": 5.6},
+    {"note": "D4", "freq": 293.66, "duration": 1.6, "delay": 6.4},
+    {"note": "G4", "freq": 392.00, "duration": 0.8, "delay": 8.0},
+    {"note": "F#4", "freq": 369.99, "duration": 0.8, "delay": 8.8},
+    {"note": "E4", "freq": 329.63, "duration": 0.8, "delay": 9.6},
+    {"note": "A4", "freq": 440.00, "duration": 1.6, "delay": 10.4},
+    {"note": "D5", "freq": 587.33, "duration": 1.2, "delay": 12.0},
+    {"note": "C#5", "freq": 554.37, "duration": 0.8, "delay": 13.2},
+    {"note": "B4", "freq": 493.88, "duration": 0.8, "delay": 14.0},
+    {"note": "A4", "freq": 440.00, "duration": 1.2, "delay": 14.8},
+    {"note": "F#4", "freq": 369.99, "duration": 0.8, "delay": 16.0},
+    {"note": "G4", "freq": 392.00, "duration": 0.8, "delay": 16.8},
+    {"note": "A4", "freq": 440.00, "duration": 1.2, "delay": 17.6},
+    {"note": "D4", "freq": 293.66, "duration": 2.4, "delay": 18.8}
+  ],
+  "harmonyChords": [
+    {"name": "D Major", "time": 0.0, "duration": 3.2, "freqs": [146.83, 220.00, 293.66, 369.99]},
+    {"name": "G Major", "time": 3.2, "duration": 3.2, "freqs": [196.00, 246.94, 293.66, 392.00]},
+    {"name": "B Minor", "time": 6.4, "duration": 3.2, "freqs": [123.47, 185.00, 220.00, 293.66]},
+    {"name": "A Major", "time": 9.6, "duration": 2.4, "freqs": [110.00, 164.81, 220.00, 277.18]},
+    {"name": "D Major", "time": 12.0, "duration": 4.0, "freqs": [146.83, 220.00, 293.66, 369.99]},
+    {"name": "G Major", "time": 16.0, "duration": 2.8, "freqs": [196.00, 246.94, 293.66, 392.00]}
+  ]
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: compositionPrompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return res.json({
+      type: 'web_audio_score',
+      title: parsed.title || `Overture to Eternal Love — ${coupleNames || 'Samson & Kevine'}`,
+      composer: 'Google Gemini 3.8 Flash AI',
+      tempo: parsed.tempo || 74,
+      key: parsed.key || 'D Major',
+      vibeDescription: parsed.vibeDescription || 'A tender, radiant acoustic piano serenade with soft orchestral string harmonics.',
+      poeticVerse: parsed.poeticVerse || 'Therefore what God has joined together, let no one separate. — Mark 10:9',
+      melodyNotes: parsed.melodyNotes || getDefaultWeddingSongScore(coupleNames).melodyNotes,
+      harmonyChords: parsed.harmonyChords || getDefaultWeddingSongScore(coupleNames).harmonyChords
+    });
+  } catch (err: any) {
+    console.error('Wedding song generator error:', err);
+    return res.json(getDefaultWeddingSongScore(req.body.coupleNames));
+  }
+});
+
 // Vite middleware in dev or static files in production
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -267,8 +399,12 @@ async function startServer() {
     });
   }
 
-  app.listen(port, () => {
-    console.log(`Aurelia Wedding Server running on port ${port}`);
+  const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`Aurelia Wedding Server running on port ${port} (http://0.0.0.0:${port})`);
+  });
+
+  server.on('error', (err: any) => {
+    console.error('Server listen error:', err);
   });
 }
 
