@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { WeddingData, GuestInvitation, SongRequest } from '../types/wedding';
 import { InvitationCardPreview } from './InvitationCardPreview';
-import { WeddingAudioPlayer, WeddingSongScore } from '../utils/weddingAudioSynthesizer';
+import { WeddingAudioPlayer, TURKISH_MARCH_SCORE } from '../utils/weddingAudioSynthesizer';
 import {
   Calendar,
   MapPin,
@@ -23,8 +23,6 @@ import {
   ExternalLink,
   Gift,
   Crown,
-  Loader2,
-  RotateCw,
   Baby,
   CarFront,
   X
@@ -187,12 +185,9 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
   const [, setCarouselProgress] = useState(0);
 
-  // Audio Atmosphere & Gemini AI Wedding Song State
+  // Audio Atmosphere State (Mozart Turkish March)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const audioPlayerRef = useRef<WeddingAudioPlayer | null>(null);
-  const [weddingSong, setWeddingSong] = useState<WeddingSongScore | null>(null);
-  const [isSongLoading, setIsSongLoading] = useState(false);
-  const [songProgress, setSongProgress] = useState(0);
   const [songVolume, setSongVolume] = useState(0.65);
   const [hasInteractedAudio, setHasInteractedAudio] = useState(false);
 
@@ -250,55 +245,29 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
     };
   }, []);
 
-  // 2. Fetch Gemini AI Wedding Song on Mount
-  const fetchWeddingSong = useCallback(async () => {
-    setIsSongLoading(true);
-    try {
-      const res = await fetch('/api/ai/wedding-song', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          coupleNames: `${wedding.partner1} & ${wedding.partner2}`,
-          weddingDate: wedding.date,
-          venue: wedding.venue
-        })
-      });
-      const data: WeddingSongScore = await res.json();
-      setWeddingSong(data);
-
-      // Initialize audio synthesizer with this score
-      if (!audioPlayerRef.current) {
-        audioPlayerRef.current = new WeddingAudioPlayer((playing, progress) => {
-          setIsPlayingAudio(playing);
-          setSongProgress(progress);
-        });
-      }
-      audioPlayerRef.current.loadScore(data);
-      audioPlayerRef.current.setVolume(songVolume);
-
-      // Attempt autoplay if allowed
-      try {
-        await audioPlayerRef.current.play();
-        setIsPlayingAudio(true);
-      } catch {
-        // Browser blocked audio autoplay until user interaction
-      }
-    } catch (err) {
-      console.warn('Could not load Gemini wedding song:', err);
-    } finally {
-      setIsSongLoading(false);
-    }
-  }, [wedding.partner1, wedding.partner2, wedding.date, wedding.venue, songVolume]);
-
+  // 2. Initialize Mozart Turkish March Audio Atmosphere
   useEffect(() => {
-    fetchWeddingSong();
+    if (!audioPlayerRef.current) {
+      audioPlayerRef.current = new WeddingAudioPlayer((playing) => {
+        setIsPlayingAudio(playing);
+      });
+      audioPlayerRef.current.loadScore(TURKISH_MARCH_SCORE);
+      audioPlayerRef.current.setVolume(songVolume);
+    }
+
+    // Attempt gentle autoplay on microsite access
+    audioPlayerRef.current.play().then(() => {
+      setIsPlayingAudio(true);
+    }).catch(() => {
+      // Browser blocked initial autoplay until guest gesture
+    });
 
     return () => {
       if (audioPlayerRef.current) {
         audioPlayerRef.current.destroy();
       }
     };
-  }, [fetchWeddingSong]);
+  }, [songVolume]);
 
   // One-time window click listener to start music if autoplay was blocked by browser
   useEffect(() => {
@@ -322,8 +291,11 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const handleToggleAudio = () => {
     setHasInteractedAudio(true);
     if (!audioPlayerRef.current) {
-      fetchWeddingSong();
-      return;
+      audioPlayerRef.current = new WeddingAudioPlayer((playing) => {
+        setIsPlayingAudio(playing);
+      });
+      audioPlayerRef.current.loadScore(TURKISH_MARCH_SCORE);
+      audioPlayerRef.current.setVolume(songVolume);
     }
     audioPlayerRef.current.toggle();
     setIsPlayingAudio(audioPlayerRef.current.isCurrentlyPlaying());
@@ -599,7 +571,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           </a>
         </nav>
 
-        {/* Right: Floating Gemini AI Wedding Song Player Toggle */}
+        {/* Right: Floating Mozart Turkish March Audio Player Toggle */}
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
@@ -609,30 +581,23 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                 ? 'bg-[#D4AF37] text-[#1C1B18] border-[#D4AF37] font-semibold shadow-md'
                 : 'bg-white/10 text-white/85 border-white/20 hover:bg-white/20'
             }`}
-            title={weddingSong ? weddingSong.title : 'Play Wedding Atmosphere Music'}
+            title="Mozart — Turkish March (Rondo alla Turca, K. 331)"
           >
-            {isSongLoading ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin text-[#D4AF37]" />
-                <span className="hidden sm:inline">Generating AI Song…</span>
-              </>
-            ) : isPlayingAudio ? (
+            {isPlayingAudio ? (
               <>
                 <div className="flex items-center gap-0.5">
                   <span className="w-1 h-3 bg-[#1C1B18] animate-pulse rounded-full" />
                   <span className="w-1 h-2 bg-[#1C1B18] animate-ping rounded-full" />
                   <span className="w-1 h-3.5 bg-[#1C1B18] animate-pulse rounded-full" />
                 </div>
-                <span className="hidden sm:inline truncate max-w-[150px]">
-                  {weddingSong ? weddingSong.title.split('—')[0].trim() : 'Wedding Song: Playing'}
-                </span>
+                <span className="hidden sm:inline">Turkish March: Playing</span>
                 <span className="sm:hidden">Playing</span>
               </>
             ) : (
               <>
-                <VolumeX className="w-3 h-3 text-white/60" />
-                <span className="hidden sm:inline">Wedding Song</span>
-                <span className="sm:hidden">Music</span>
+                <Music className="w-3 h-3 text-[#D4AF37]" />
+                <span className="hidden sm:inline">Play Turkish March</span>
+                <span className="sm:hidden">Play Song</span>
               </>
             )}
           </button>
@@ -1330,7 +1295,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
         </div>
       </section>
 
-      {/* 6. DANCE FLOOR SONG REQUEST BOX & GEMINI AI WEDDING SONG GENERATOR */}
+      {/* 6. DANCE FLOOR SONG REQUEST BOX & TURKISH MARCH ATMOSPHERE */}
       <section
         id="microsite-music"
         className="relative py-24 bg-cover bg-center overflow-hidden border-y border-[#B59A72]/20"
@@ -1347,117 +1312,68 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
               <Music className="w-6 h-6" />
             </div>
             <p className="text-xs font-editorial uppercase tracking-[0.25em] text-[#D4AF37] font-semibold mb-1">
-              The Celebration Music &amp; Soundtrack
+              The Celebration Playlist
             </p>
             <h2 className="font-editorial text-3xl sm:text-4xl text-[#FAF7F0] font-normal">
-              Gemini AI Wedding Song &amp; Dance Floor Playlist
+              Request a Song for the Dance Floor
             </h2>
             <p className="text-xs text-neutral-300 max-w-lg mx-auto mt-2 leading-relaxed">
-              Listen to the custom wedding soundtrack composed for {wedding.partner1} &amp; {wedding.partner2} by Gemini API, and request your favorite tracks for our evening dance floor!
+              Help {wedding.partner1} &amp; {wedding.partner2} build the ultimate wedding playlist for the DJ at our evening Rooftop celebration in Salt River!
             </p>
           </div>
 
-          {/* GEMINI AI WEDDING SONG PLAYER CARD */}
-          <div className="bg-[#FAF7F0] p-6 sm:p-8 rounded-sm border-2 border-[#D4AF37]/60 shadow-2xl mb-10">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[#B59A72]/20">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#8C6D45]/15 text-[#8C6D45] text-[10px] font-mono uppercase tracking-widest font-bold">
-                    Gemini AI Composition
-                  </span>
-                  <span className="text-[11px] font-mono text-neutral-500">
-                    {weddingSong?.key || 'D Major'} · {weddingSong?.tempo || 74} BPM
-                  </span>
-                </div>
-                <h3 className="font-editorial text-2xl sm:text-3xl text-[#292722]">
-                  {weddingSong?.title || `Overture to Eternal Love — ${wedding.partner1} & ${wedding.partner2}`}
-                </h3>
-                <p className="text-xs text-neutral-600 font-editorial italic">
-                  {weddingSong?.vibeDescription || 'A tender, radiant acoustic piano serenade with soft orchestral string harmonics.'}
-                </p>
-              </div>
-
-              {/* Play / Pause Main Trigger */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleToggleAudio}
-                  className="w-14 h-14 rounded-full bg-[#292722] hover:bg-[#8C6D45] text-[#D4AF37] hover:text-white flex items-center justify-center transition-transform hover:scale-105 shadow-xl shrink-0"
-                  aria-label={isPlayingAudio ? 'Pause wedding song' : 'Play wedding song'}
-                >
-                  {isPlayingAudio ? (
-                    <Pause className="w-6 h-6 fill-current" />
-                  ) : (
-                    <Play className="w-6 h-6 fill-current translate-x-0.5" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={fetchWeddingSong}
-                  disabled={isSongLoading}
-                  className="p-3 rounded-full border border-[#B59A72]/40 text-[#292722] hover:bg-[#F3EDE2] transition-colors disabled:opacity-50"
-                  title="Regenerate wedding song using Gemini API"
-                >
-                  <RotateCw className={`w-4 h-4 ${isSongLoading ? 'animate-spin text-[#8C6D45]' : ''}`} />
-                </button>
+          {/* Classical Atmosphere Audio Control (Mozart Turkish March) */}
+          <div className="bg-[#FAF7F0]/95 backdrop-blur-md p-4 sm:p-5 rounded-sm border border-[#B59A72]/30 shadow-lg mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleToggleAudio}
+                className="w-11 h-11 rounded-full bg-[#292722] hover:bg-[#8C6D45] text-[#D4AF37] hover:text-white flex items-center justify-center transition-transform hover:scale-105 shrink-0 shadow-md"
+                aria-label={isPlayingAudio ? 'Pause Turkish March' : 'Play Turkish March'}
+              >
+                {isPlayingAudio ? (
+                  <Pause className="w-5 h-5 fill-current" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current translate-x-0.5" />
+                )}
+              </button>
+              <div>
+                <span className="font-editorial text-lg text-[#292722] font-semibold block leading-tight">
+                  Turkish March (Rondo alla Turca)
+                </span>
+                <span className="text-[11px] text-[#8C6D45] font-mono">
+                  Wolfgang Amadeus Mozart · Piano Sonata No. 11, K. 331
+                </span>
               </div>
             </div>
 
-            {/* Live Visualizer Bars & Timeline Progress */}
-            <div className="pt-6 space-y-4">
-              <div className="flex items-center gap-1.5 h-8 justify-center py-1">
-                {[40, 65, 30, 85, 95, 55, 75, 45, 90, 60, 80, 50, 70, 90, 40, 60].map((h, i) => (
-                  <span
-                    key={i}
-                    className="w-1.5 bg-[#8C6D45] rounded-full transition-all duration-200"
-                    style={{
-                      height: isPlayingAudio ? `${Math.max(15, (h * (0.4 + (songProgress * 5) % 1)))}%` : '20%',
-                      opacity: isPlayingAudio ? 0.9 : 0.3
-                    }}
-                  />
-                ))}
-              </div>
-
-              {/* Progress Slider */}
-              <div className="space-y-1">
-                <div className="w-full bg-[#B59A72]/20 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-[#8C6D45] h-full transition-all duration-150 rounded-full"
-                    style={{ width: `${Math.min(100, Math.max(0, songProgress * 100))}%` }}
-                  />
+            <div className="flex items-center gap-4 text-xs">
+              {isPlayingAudio && (
+                <div className="flex items-center gap-1 h-4">
+                  <span className="w-1 h-3 bg-[#8C6D45] animate-pulse rounded-full" />
+                  <span className="w-1 h-4 bg-[#8C6D45] animate-ping rounded-full" />
+                  <span className="w-1 h-2 bg-[#8C6D45] animate-pulse rounded-full" />
+                  <span className="w-1 h-3.5 bg-[#8C6D45] animate-bounce rounded-full" />
                 </div>
-                <div className="flex justify-between text-[10px] font-mono text-neutral-500">
-                  <span>0:{(Math.floor(songProgress * 22)).toString().padStart(2, '0')}</span>
-                  <span>Audio Synthesizer: 0:22 (Seamless Loop)</span>
-                </div>
-              </div>
-
-              {/* Volume & Poetic Verse */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-2 text-xs text-neutral-600">
-                  <button
-                    type="button"
-                    onClick={() => handleVolumeChange(songVolume > 0 ? 0 : 0.65)}
-                    className="text-[#8C6D45] hover:text-[#292722]"
-                  >
-                    {songVolume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={songVolume}
-                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                    className="w-24 accent-[#8C6D45] cursor-pointer"
-                  />
-                  <span className="font-mono text-[10px]">{Math.round(songVolume * 100)}%</span>
-                </div>
-
-                <p className="font-editorial italic text-xs text-[#8C6D45] text-center sm:text-right">
-                  {weddingSong?.poeticVerse || '“Therefore what God has joined together, let no one separate.” — Mark 10:9'}
-                </p>
+              )}
+              <div className="flex items-center gap-2 text-neutral-600">
+                <button
+                  type="button"
+                  onClick={() => handleVolumeChange(songVolume > 0 ? 0 : 0.65)}
+                  className="text-[#8C6D45] hover:text-[#292722]"
+                >
+                  {songVolume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={songVolume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  className="w-20 accent-[#8C6D45] cursor-pointer"
+                />
+                <span className="font-mono text-[10px]">{Math.round(songVolume * 100)}%</span>
               </div>
             </div>
           </div>
