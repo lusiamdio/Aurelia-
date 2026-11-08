@@ -17,9 +17,9 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#292722]/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[#B59A72]/40 shadow-2xl relative text-[#292722]">
+      <div className="bg-white rounded-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative text-[#292722]">
         {/* Email Header bar */}
-        <div className="bg-[#FAF7F0] p-4 border-b border-[#B59A72]/20 flex items-center justify-between">
+        <div className="bg-[#FAF7F0] p-4 flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2 text-xs text-neutral-600">
             <Mail className="w-4 h-4 text-[#8C6D45]" />
             <span className="font-semibold text-[#292722]">Invitation Delivery Preview:</span>
@@ -29,14 +29,14 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-800 font-mono text-sm"
+            className="text-neutral-400 hover:text-neutral-800 font-mono text-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             ✕
           </button>
         </div>
 
         {/* Email metadata fields */}
-        <div className="px-6 py-3 border-b border-neutral-100 text-xs text-neutral-500 space-y-1 bg-[#FCFAF7]">
+        <div className="px-6 py-3 text-xs text-neutral-500 space-y-1 bg-[#FCFAF7]">
           <div>
             <strong className="text-neutral-700">From:</strong> {wedding.partner1} &amp; {wedding.partner2} via Aurelia Concierge &lt;invitations@aurelia.invites&gt;
           </div>
@@ -47,7 +47,7 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
 
         {/* Email Body: Luxury Stationery Card */}
         <div className="p-6 sm:p-10 bg-[#F3EDE2]/40 flex justify-center">
-          <div className="w-full max-w-lg bg-[#FAF7F0] border border-[#B59A72]/30 p-8 rounded-xs text-center shadow-md">
+          <div className="w-full max-w-lg bg-[#FAF7F0] p-8 rounded-xs text-center shadow-lg">
             {/* Monogram */}
             <div className="font-editorial italic text-lg text-[#8C6D45] mb-2">
               {wedding.monogram}
@@ -67,7 +67,7 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
             </p>
 
             {/* Personalized Guest Box */}
-            <div className="my-5 py-3 px-4 bg-white/70 border-y border-[#B59A72]/30 rounded-xs">
+            <div className="my-5 py-4 px-4 bg-white/80 rounded-xs shadow-xs">
               <span className="font-editorial text-2xl text-[#292722]">
                 Dear {guest.fullName},
               </span>
@@ -82,7 +82,7 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
               &ldquo;We would be delighted to have you celebrate our wedding day with us in Cape Town.&rdquo;
             </p>
 
-            <div className="space-y-1.5 text-xs text-neutral-700 py-3 border-y border-[#B59A72]/20 mb-6">
+            <div className="space-y-1.5 text-xs text-neutral-700 py-3 bg-black/5 rounded-xs p-3 mb-6">
               <div className="font-semibold">{wedding.date}</div>
               <div>{wedding.venue}</div>
               <div className="text-neutral-500">{wedding.city}</div>
@@ -91,7 +91,7 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
             <div className="space-y-3">
               <button
                 onClick={onClose}
-                className="w-full py-3 bg-[#292722] text-white text-xs font-semibold tracking-wider uppercase rounded-xs hover:bg-[#8C6D45] transition-colors"
+                className="w-full py-3.5 bg-[#292722] text-white text-xs font-semibold tracking-wider uppercase rounded-xs hover:bg-[#8C6D45] transition-colors min-h-[44px] shadow-sm"
               >
                 Access Digital Pass &amp; Itinerary
               </button>
@@ -103,11 +103,11 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-[#FAF7F0] border-t border-[#B59A72]/20 text-center text-xs text-neutral-500 flex justify-between items-center">
+        <div className="p-4 bg-[#FAF7F0] text-center text-xs text-neutral-500 flex justify-between items-center shadow-xs">
           <span>Sent via Aurelia Certified Delivery</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-[#292722] text-white rounded-xs text-xs"
+            className="px-5 py-2.5 bg-[#292722] text-white rounded-xs text-xs font-semibold min-h-[44px]"
           >
             Close Preview
           </button>

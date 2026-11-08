@@ -768,15 +768,15 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
 
       {/* Real-Time Gemini AI PDF Generation Stepper (Active during download) */}
       {downloadingType && (
-        <div className="mt-4 w-full max-w-xl bg-[#1C1B18] text-[#FAF7F0] p-4 sm:p-5 rounded-xs border border-[#D4AF37]/50 shadow-2xl transition-all">
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+        <div className="mt-4 w-full max-w-xl bg-[#1C1B18] text-[#FAF7F0] p-4 sm:p-5 rounded-xs shadow-2xl transition-all">
+          <div className="flex items-center justify-between pb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#D4AF37] animate-spin" />
               <span className="font-editorial text-sm tracking-wide text-white font-medium">
                 Gemini AI Bespoke PDF Engine
               </span>
             </div>
-            <span className="text-[11px] font-mono text-[#D4AF37] px-2.5 py-0.5 rounded-full bg-white/5 border border-[#D4AF37]/30">
+            <span className="text-[11px] font-mono text-[#D4AF37] px-2.5 py-0.5 rounded-full bg-white/10 shadow-xs">
               {downloadingType === 'card' ? 'Landscape Ceremony Card' : 'QR Digital Venue Pass'}
             </span>
           </div>
@@ -806,12 +806,12 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
               return (
                 <div
                   key={step}
-                  className={`flex items-center gap-2.5 p-2 rounded-xs transition-colors border ${
+                  className={`flex items-center gap-2.5 p-2 rounded-xs transition-colors ${
                     isCurrent
-                      ? 'bg-[#D4AF37]/15 border-[#D4AF37]/60 text-white font-medium shadow-xs'
+                      ? 'bg-[#D4AF37]/25 text-white font-medium shadow-xs'
                       : isCompleted
-                      ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300'
-                      : 'bg-white/5 border-white/5 text-neutral-400'
+                      ? 'bg-emerald-950/40 text-emerald-300'
+                      : 'bg-white/5 text-neutral-400'
                   }`}
                 >
                   <div className="shrink-0">
@@ -820,7 +820,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                     ) : isCurrent ? (
                       <Loader2 className="w-3.5 h-3.5 text-[#D4AF37] animate-spin" />
                     ) : (
-                      <div className="w-3.5 h-3.5 rounded-full border border-neutral-600 flex items-center justify-center text-[9px] font-mono text-neutral-400">
+                      <div className="w-3.5 h-3.5 rounded-full bg-neutral-700 flex items-center justify-center text-[9px] font-mono text-neutral-300">
                         {idx + 1}
                       </div>
                     )}
@@ -850,7 +850,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
             type="button"
             onClick={handleDownloadCard}
             disabled={downloadingType !== null}
-            className="group relative flex flex-col items-start p-3.5 text-left bg-[#FAF7F0] hover:bg-[#F3EDE2] border border-[#B59A72]/50 hover:border-[#8C6D45] rounded-xs shadow-xs hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group relative flex flex-col items-start p-4 text-left bg-[#FAF7F0] hover:bg-[#F3EDE2] rounded-xs shadow-md hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
             <div className="flex items-center justify-between w-full mb-1">
               <span className="font-editorial text-sm font-semibold text-[#292722] group-hover:text-[#8C6D45] transition-colors">
@@ -875,7 +875,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
             type="button"
             onClick={handleDownloadPass}
             disabled={downloadingType !== null}
-            className="group relative flex flex-col items-start p-3.5 text-left bg-white hover:bg-neutral-50 border border-[#292722]/30 hover:border-[#292722] rounded-xs shadow-xs hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group relative flex flex-col items-start p-4 text-left bg-white hover:bg-neutral-50 rounded-xs shadow-md hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
             <div className="flex items-center justify-between w-full mb-1">
               <span className="font-editorial text-sm font-semibold text-[#292722] group-hover:text-[#8C6D45] transition-colors">

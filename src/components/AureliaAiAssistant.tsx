@@ -201,7 +201,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
       <div className="fixed bottom-6 right-6 z-40">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="group relative flex items-center gap-2.5 px-4 py-3 bg-[#1C1B18] hover:bg-[#8C6D45] text-white rounded-full shadow-2xl border border-[#D4AF37]/40 transition-all duration-300 hover:scale-105"
+          className="group relative flex items-center gap-2.5 px-4 py-3 bg-[#1C1B18] hover:bg-[#8C6D45] text-white rounded-full shadow-2xl transition-all duration-300 hover:scale-105 min-h-[44px]"
         >
           <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-[#D4AF37] animate-pulse" />
@@ -215,9 +215,9 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
 
       {/* Floating Concierge Drawer / Modal */}
       {isOpen && (
-        <div className="fixed bottom-22 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] max-h-[82vh] bg-[#FAF7F0] rounded-sm border border-[#B59A72]/40 shadow-2xl flex flex-col overflow-hidden text-[#292722]">
+        <div className="fixed bottom-22 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[420px] max-h-[82vh] bg-[#FAF7F0] rounded-sm shadow-2xl flex flex-col overflow-hidden text-[#292722]">
           {/* Header */}
-          <div className="bg-[#1C1B18] text-[#FAF7F0] p-4 flex items-center justify-between border-b border-[#D4AF37]/30">
+          <div className="bg-[#1C1B18] text-[#FAF7F0] p-4 flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37]">
                 <Bot className="w-4 h-4" />
@@ -236,19 +236,19 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 text-neutral-400 hover:text-white rounded-xs transition-colors"
+              className="p-1 text-neutral-400 hover:text-white rounded-xs transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Sub Navigation Tabs */}
-          <div className="flex bg-[#EFEAE2] border-b border-[#B59A72]/20 text-xs font-medium">
+          <div className="flex bg-[#EFEAE2] text-xs font-medium shadow-xs">
             <button
               onClick={() => setActiveTab('chat')}
-              className={`flex-1 py-2.5 text-center flex items-center justify-center gap-1.5 transition-colors ${
+              className={`flex-1 py-3 text-center flex items-center justify-center gap-1.5 transition-colors min-h-[44px] ${
                 activeTab === 'chat'
-                  ? 'bg-[#FAF7F0] text-[#8C6D45] font-semibold border-b-2 border-[#8C6D45]'
+                  ? 'bg-[#FAF7F0] text-[#8C6D45] font-semibold shadow-xs'
                   : 'text-neutral-600 hover:text-[#292722]'
               }`}
             >
@@ -257,9 +257,9 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('vows')}
-              className={`flex-1 py-2.5 text-center flex items-center justify-center gap-1.5 transition-colors ${
+              className={`flex-1 py-3 text-center flex items-center justify-center gap-1.5 transition-colors min-h-[44px] ${
                 activeTab === 'vows'
-                  ? 'bg-[#FAF7F0] text-[#8C6D45] font-semibold border-b-2 border-[#8C6D45]'
+                  ? 'bg-[#FAF7F0] text-[#8C6D45] font-semibold shadow-xs'
                   : 'text-neutral-600 hover:text-[#292722]'
               }`}
             >
@@ -268,9 +268,9 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('travel')}
-              className={`flex-1 py-2.5 text-center flex items-center justify-center gap-1.5 transition-colors ${
+              className={`flex-1 py-3 text-center flex items-center justify-center gap-1.5 transition-colors min-h-[44px] ${
                 activeTab === 'travel'
-                  ? 'bg-[#FAF7F0] text-[#8C6D45] font-semibold border-b-2 border-[#8C6D45]'
+                  ? 'bg-[#FAF7F0] text-[#8C6D45] font-semibold shadow-xs'
                   : 'text-neutral-600 hover:text-[#292722]'
               }`}
             >
@@ -292,7 +292,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                       className={`max-w-[85%] p-3 rounded-xs leading-relaxed ${
                         m.role === 'user'
                           ? 'bg-[#292722] text-[#FAF7F0]'
-                          : 'bg-white border border-[#B59A72]/30 text-[#292722] shadow-xs'
+                          : 'bg-white text-[#292722] shadow-sm'
                       }`}
                     >
                       <p>{m.content}</p>
@@ -301,7 +301,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                 ))}
                 {isChatLoading && (
                   <div className="flex justify-start">
-                    <div className="p-3 bg-white border border-[#B59A72]/30 rounded-xs flex items-center gap-2 text-neutral-500 text-xs">
+                    <div className="p-3 bg-white rounded-xs flex items-center gap-2 text-neutral-500 text-xs shadow-xs">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8C6D45]" />
                       <span>Aurelia is consulting wedding concierge records...</span>
                     </div>
@@ -310,18 +310,18 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
               </div>
 
               {/* Chat Input */}
-              <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-[#B59A72]/20 flex gap-2">
+              <form onSubmit={handleSendMessage} className="p-3 bg-white flex gap-2 shadow-xs">
                 <input
                   type="text"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Ask about attire, schedule, airport..."
-                  className="flex-1 px-3 py-2 text-xs bg-[#FAF7F0] border border-[#B59A72]/30 rounded-xs focus:outline-hidden focus:border-[#8C6D45]"
+                  className="flex-1 px-3 py-2 text-xs bg-[#FAF7F0] rounded-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45] shadow-xs"
                 />
                 <button
                   type="submit"
                   disabled={isChatLoading || !inputMessage.trim()}
-                  className="p-2 bg-[#292722] hover:bg-[#8C6D45] text-white rounded-xs transition-colors disabled:opacity-40"
+                  className="p-2.5 bg-[#292722] hover:bg-[#8C6D45] text-white rounded-xs transition-colors disabled:opacity-40 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
@@ -347,7 +347,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                   <select
                     value={vowPartner}
                     onChange={(e) => setVowPartner(e.target.value as 'partner1' | 'partner2')}
-                    className="w-full px-2.5 py-1.5 bg-white border border-[#B59A72]/30 rounded-xs text-xs"
+                    className="w-full px-2.5 py-2 bg-white rounded-xs text-xs shadow-xs focus:ring-1 focus:ring-[#8C6D45]"
                   >
                     <option value="partner1">{wedding.partner1}</option>
                     <option value="partner2">{wedding.partner2}</option>
@@ -358,7 +358,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                   <select
                     value={vowTone}
                     onChange={(e) => setVowTone(e.target.value as any)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-[#B59A72]/30 rounded-xs text-xs"
+                    className="w-full px-2.5 py-2 bg-white rounded-xs text-xs shadow-xs focus:ring-1 focus:ring-[#8C6D45]"
                   >
                     <option value="poetic">Poetic &amp; Lyrical</option>
                     <option value="timeless">Timeless &amp; Classic</option>
@@ -376,7 +376,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                   rows={2}
                   value={vowMemories}
                   onChange={(e) => setVowMemories(e.target.value)}
-                  className="w-full p-2 bg-white border border-[#B59A72]/30 rounded-xs text-xs"
+                  className="w-full p-2.5 bg-white rounded-xs text-xs shadow-xs focus:ring-1 focus:ring-[#8C6D45]"
                 />
               </div>
 
@@ -384,7 +384,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                 type="button"
                 onClick={handleGenerateVows}
                 disabled={isVowLoading}
-                className="w-full py-2.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+                className="w-full py-3 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 min-h-[44px]"
               >
                 {isVowLoading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -395,15 +395,15 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
               </button>
 
               {generatedVows && (
-                <div className="p-3 bg-white rounded-xs border border-[#B59A72]/30 relative mt-3">
+                <div className="p-3.5 bg-white rounded-xs shadow-md relative mt-3">
                   <p className="font-editorial italic text-xs leading-relaxed text-[#292722]">
                     {generatedVows}
                   </p>
-                  <div className="mt-2 pt-2 border-t border-neutral-100 flex items-center justify-between">
+                  <div className="mt-3 pt-2 flex items-center justify-between">
                     <button
                       type="button"
                       onClick={copyVowsToClipboard}
-                      className="text-[11px] text-[#8C6D45] hover:underline flex items-center gap-1 font-medium"
+                      className="text-[11px] text-[#8C6D45] hover:underline flex items-center gap-1 font-medium min-h-[44px]"
                     >
                       {vowCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                       <span>{vowCopied ? 'Copied to clipboard' : 'Copy Vows'}</span>
@@ -412,7 +412,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                       <button
                         type="button"
                         onClick={() => onApplyWording(`An Invitation to Celebrate Love`, generatedVows)}
-                        className="text-[11px] font-semibold text-[#292722] hover:underline"
+                        className="text-[11px] font-semibold text-[#292722] hover:underline min-h-[44px]"
                       >
                         Apply to Invitation
                       </button>
@@ -442,13 +442,13 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                     type="text"
                     value={travelQuery}
                     onChange={(e) => setTravelQuery(e.target.value)}
-                    className="flex-1 p-2 bg-white border border-[#B59A72]/30 rounded-xs text-xs"
+                    className="flex-1 p-2.5 bg-white rounded-xs text-xs shadow-xs focus:ring-1 focus:ring-[#8C6D45]"
                   />
                   <button
                     type="button"
                     onClick={handleSearchGrounding}
                     disabled={isTravelLoading || !travelQuery.trim()}
-                    className="px-3 py-2 bg-[#292722] hover:bg-[#8C6D45] text-white rounded-xs transition-colors shrink-0 disabled:opacity-40"
+                    className="px-4 py-2 bg-[#292722] hover:bg-[#8C6D45] text-white rounded-xs transition-colors shrink-0 disabled:opacity-40 min-h-[44px]"
                   >
                     {isTravelLoading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -460,7 +460,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
               </div>
 
               {travelResult && (
-                <div className="p-3 bg-white rounded-xs border border-[#B59A72]/30 space-y-2">
+                <div className="p-3.5 bg-white rounded-xs shadow-md space-y-2">
                   <span className="text-[10px] font-mono uppercase tracking-wider text-[#8C6D45] block font-semibold">
                     Live Verified Information:
                   </span>
@@ -469,7 +469,7 @@ export const AureliaAiAssistant: React.FC<AureliaAiAssistantProps> = ({
                   </p>
 
                   {travelSources.length > 0 && (
-                    <div className="pt-2 border-t border-neutral-100">
+                    <div className="pt-2">
                       <span className="text-[10px] text-neutral-500 block mb-1">Sources:</span>
                       <div className="space-y-0.5">
                         {travelSources.slice(0, 3).map((s, idx) => (

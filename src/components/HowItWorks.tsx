@@ -67,15 +67,15 @@ export const HowItWorks: React.FC<{
 
         {/* 3-Core Steps Highlight Strip */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-16">
-          <div className="p-6 bg-[#FAF7F0] rounded-sm border border-[#B59A72]/25 text-center">
+          <div className="p-6 bg-[#FAF7F0] rounded-sm shadow-md hover:shadow-lg transition-shadow text-center">
             <span className="font-editorial text-3xl text-[#8C6D45] block mb-1">01. Create</span>
             <p className="text-xs text-[#5A554E]">Design your bespoke digital invitation suite and multi-event itinerary in minutes.</p>
           </div>
-          <div className="p-6 bg-[#FAF7F0] rounded-sm border border-[#B59A72]/25 text-center">
+          <div className="p-6 bg-[#FAF7F0] rounded-sm shadow-md hover:shadow-lg transition-shadow text-center">
             <span className="font-editorial text-3xl text-[#8C6D45] block mb-1">02. Personalize</span>
             <p className="text-xs text-[#5A554E]">Guests generate their unique pass, plus-ones, and tailored dietary preferences.</p>
           </div>
-          <div className="p-6 bg-[#FAF7F0] rounded-sm border border-[#B59A72]/25 text-center">
+          <div className="p-6 bg-[#FAF7F0] rounded-sm shadow-md hover:shadow-lg transition-shadow text-center">
             <span className="font-editorial text-3xl text-[#8C6D45] block mb-1">03. Share</span>
             <p className="text-xs text-[#5A554E]">Distribute seamlessly across WhatsApp, high-res PDF, and track RSVPs live.</p>
           </div>
@@ -88,7 +88,7 @@ export const HowItWorks: React.FC<{
             return (
               <div
                 key={step.num}
-                className="bg-[#FAF7F0]/80 p-6 sm:p-8 rounded-sm border border-[#B59A72]/30 flex flex-col justify-between hover:border-[#8C6D45] transition-colors"
+                className="bg-[#FAF7F0]/90 p-6 sm:p-8 rounded-sm shadow-md hover:shadow-xl flex flex-col justify-between transition-all duration-300"
               >
                 <div>
                   <div className="flex items-center justify-between mb-4">

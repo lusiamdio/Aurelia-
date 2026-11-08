@@ -49,6 +49,7 @@ export interface SongRequest {
   djNotes?: string;
   danceEnergy?: 'chill' | 'mid-tempo' | 'high-energy' | 'party-anthem';
   requestedAt?: string;
+  votes?: number;
 }
 
 export interface WeddingData {

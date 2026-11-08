@@ -980,8 +980,8 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
 
             {/* AI DJ Recommendations Output Box */}
             {aiDjCuratorAdvice && (
-              <div className="p-5 bg-[#1C1B18] text-[#FAF7F0] rounded-sm border border-[#D4AF37]/40 shadow-lg relative">
-                <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+              <div className="p-5 bg-[#1C1B18] text-[#FAF7F0] rounded-sm shadow-xl relative">
+                <div className="flex items-center justify-between mb-3 pb-2">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-[#D4AF37]" />
                     <span className="font-editorial text-lg text-white">
@@ -1003,23 +1003,23 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
 
             {/* Metrics Breakdown */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30 text-xs">
+              <div className="bg-[#FAF7F0] p-4 rounded-sm shadow-sm text-xs">
                 <span className="text-neutral-500 uppercase tracking-wider text-[10px] block">Total Requests</span>
                 <span className="font-editorial text-2xl text-[#292722]">{songList.length} Tracks</span>
               </div>
-              <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30 text-xs">
+              <div className="bg-[#FAF7F0] p-4 rounded-sm shadow-sm text-xs">
                 <span className="text-amber-700 font-semibold uppercase tracking-wider text-[10px] block">★ Must-Plays</span>
                 <span className="font-editorial text-2xl text-amber-800">
                   {songList.filter((s) => s.status === 'must-play').length} Tracks
                 </span>
               </div>
-              <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30 text-xs">
+              <div className="bg-[#FAF7F0] p-4 rounded-sm shadow-sm text-xs">
                 <span className="text-emerald-700 font-semibold uppercase tracking-wider text-[10px] block">✓ Approved</span>
                 <span className="font-editorial text-2xl text-emerald-800">
                   {songList.filter((s) => s.status === 'approved').length} Tracks
                 </span>
               </div>
-              <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30 text-xs">
+              <div className="bg-[#FAF7F0] p-4 rounded-sm shadow-sm text-xs">
                 <span className="text-neutral-500 uppercase tracking-wider text-[10px] block">• Pending Review</span>
                 <span className="font-editorial text-2xl text-neutral-700">
                   {songList.filter((s) => !s.status || s.status === 'pending').length} Tracks
@@ -1028,7 +1028,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
             </div>
 
             {/* Filter buttons */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#FAF7F0] rounded-xs border border-[#B59A72]/20 text-xs w-fit">
+            <div className="flex items-center gap-1.5 p-1 bg-[#FAF7F0] rounded-xs shadow-xs text-xs w-fit">
               {[
                 { id: 'all', label: `All (${songList.length})` },
                 { id: 'must-play', label: `★ Must-Play (${songList.filter((s) => s.status === 'must-play').length})` },
@@ -1052,7 +1052,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
             </div>
 
             {/* Song Table */}
-            <div className="bg-[#FAF7F0] rounded-sm border border-[#B59A72]/30 overflow-hidden shadow-xs">
+            <div className="bg-[#FAF7F0] rounded-sm overflow-hidden shadow-md">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#EFEAE2] border-b border-[#B59A72]/20 text-[11px] uppercase tracking-wider text-neutral-600">

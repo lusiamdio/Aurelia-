@@ -68,10 +68,10 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#1C1B18]/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-[#FAF7F0] rounded-sm max-w-md w-full border border-[#B59A72]/40 shadow-2xl p-6 sm:p-8 relative">
+      <div className="bg-[#FAF7F0] rounded-sm max-w-md w-full shadow-2xl p-6 sm:p-8 relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 text-neutral-400 hover:text-neutral-800 transition-colors"
+          className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-neutral-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           title="Close modal"
         >
           <X className="w-4 h-4" />
@@ -93,14 +93,14 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xs flex items-start gap-2">
+          <div className="mb-4 p-3 bg-rose-50 text-rose-800 text-xs rounded-xs flex items-start gap-2 shadow-xs">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
         {isSuccess && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xs flex items-center gap-2">
+          <div className="mb-4 p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xs flex items-center gap-2 shadow-xs">
             <Check className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>Identity confirmed! Welcome back, {p1First} &amp; {p2First}.</span>
           </div>
@@ -117,7 +117,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
               value={credentialInput}
               onChange={(e) => setCredentialInput(e.target.value)}
               placeholder={`e.g. ${p1First} & ${p2First} or Alex & Anna`}
-              className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#B59A72]/40 rounded-xs text-[#292722] focus:outline-hidden focus:border-[#8C6D45]"
+              className="w-full px-3.5 py-3 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
             />
             <span className="text-[10px] text-neutral-500 mt-1 block">
               Format: Both partners&apos; first names joined by &amp; (e.g. &ldquo;{p1First} &amp; {p2First}&rdquo;)
@@ -134,9 +134,9 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
                 placeholder="2027"
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#B59A72]/40 rounded-xs text-[#292722] focus:outline-hidden focus:border-[#8C6D45]"
+                className="w-full px-3.5 py-3 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
               />
-              <KeyRound className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3 opacity-60" />
+              <KeyRound className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3.5 opacity-60" />
             </div>
             <span className="text-[10px] text-neutral-500 mt-1 block">
               Standard administrative PIN: <strong className="text-[#292722]">2027</strong>
@@ -146,7 +146,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
           <div className="pt-2 space-y-2">
             <button
               type="submit"
-              className="w-full py-3 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors shadow-sm flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors shadow-sm flex items-center justify-center gap-2 min-h-[44px]"
             >
               <ShieldCheck className="w-4 h-4 text-[#B59A72]" />
               <span>Sign In as Couple Admin</span>
@@ -155,7 +155,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
             <button
               type="button"
               onClick={handleQuickDemoFill}
-              className="w-full py-2 bg-white hover:bg-neutral-100 border border-[#B59A72]/40 text-[#8C6D45] text-[11px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1.5"
+              className="w-full py-3 bg-white hover:bg-neutral-100 text-[#8C6D45] text-[11px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs min-h-[44px]"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Autofill Assigned Credential ({p1First} &amp; {p2First})</span>
@@ -163,7 +163,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
           </div>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-[#B59A72]/20 text-center text-[11px] text-neutral-500">
+        <div className="mt-5 pt-4 text-center text-[11px] text-neutral-500">
           Guests do not require credentials — guests can access the wedding microsite and book/generate invitations freely.
         </div>
       </div>

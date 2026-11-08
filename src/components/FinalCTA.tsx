@@ -13,7 +13,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onCreateClick, onExploreClic
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(181,154,114,0.15)_0,transparent_70%)] pointer-events-none" />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10">
-        <div className="w-10 h-10 rounded-full border border-[#B59A72]/40 flex items-center justify-center mx-auto mb-6 text-[#B59A72]">
+        <div className="w-10 h-10 rounded-full bg-[#B59A72]/20 flex items-center justify-center mx-auto mb-6 text-[#B59A72] shadow-xs">
           <Sparkles className="w-4 h-4" />
         </div>
 
@@ -32,14 +32,14 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onCreateClick, onExploreClic
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={onCreateClick}
-            className="w-full sm:w-auto px-8 py-3.5 bg-[#B59A72] hover:bg-[#8C6D45] text-white text-xs font-semibold tracking-[0.16em] uppercase rounded-xs transition-colors shadow-lg flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-8 py-3.5 bg-[#B59A72] hover:bg-[#8C6D45] text-white text-xs font-semibold tracking-[0.16em] uppercase rounded-xs transition-colors shadow-lg flex items-center justify-center gap-2 min-h-[44px]"
           >
             <span>Create Your Wedding Invitation</span>
             <ArrowRight className="w-4 h-4" />
           </button>
           <button
             onClick={onExploreClick}
-            className="w-full sm:w-auto px-8 py-3.5 bg-transparent hover:bg-white/5 text-[#F3EDE2] border border-[#B59A72]/40 text-xs font-semibold tracking-[0.16em] uppercase rounded-xs transition-colors"
+            className="w-full sm:w-auto px-8 py-3.5 bg-white/10 hover:bg-white/20 text-[#F3EDE2] text-xs font-semibold tracking-[0.16em] uppercase rounded-xs transition-colors min-h-[44px] shadow-md"
           >
             Explore Collections
           </button>

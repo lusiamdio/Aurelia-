@@ -1,7 +1,22 @@
 /**
- * Web Audio Polyphonic Classical Piano Synthesizer
- * Featuring Mozart's Turkish March (Rondo alla Turca, K. 331)
+ * ============================================================================
+ * 🎵 HOW TO CHANGE THE WEDDING SONG IN THIS APPLICATION:
+ * ============================================================================
+ * 
+ * File: /src/utils/weddingAudioSynthesizer.ts
+ * 
+ * OPTION 1 (Custom MP3 or Audio Stream URL — Easiest):
+ *   Change `CUSTOM_WEDDING_AUDIO_URL` below to any MP3 file or audio link.
+ *   Example: 
+ *     export const CUSTOM_WEDDING_AUDIO_URL: string | null = "https://cdn.example.com/our-song.mp3";
+ *   When set, the player will play this audio file with full volume and visualizer support!
+ * 
+ * OPTION 2 (Synthesized Piano Music):
+ *   Leave `CUSTOM_WEDDING_AUDIO_URL = null` to use the built-in piano synthesizer.
+ *   You can modify `TURKISH_MARCH_SCORE` (notes, tempo, chords) below to play any song.
+ * ============================================================================
  */
+export const CUSTOM_WEDDING_AUDIO_URL: string | null = null;
 
 export interface MelodyNote {
   note: string;
@@ -192,6 +207,7 @@ export class WeddingAudioPlayer {
   private analyser: AnalyserNode | null = null;
   private onStateChange?: (isPlaying: boolean, progress: number) => void;
   private volume = 0.65;
+  private htmlAudio: HTMLAudioElement | null = null;
 
   constructor(onStateChange?: (isPlaying: boolean, progress: number) => void) {
     this.onStateChange = onStateChange;
@@ -218,6 +234,9 @@ export class WeddingAudioPlayer {
 
   public setVolume(vol: number) {
     this.volume = Math.max(0, Math.min(1, vol));
+    if (this.htmlAudio) {
+      this.htmlAudio.volume = this.volume;
+    }
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
     }
@@ -236,6 +255,20 @@ export class WeddingAudioPlayer {
   }
 
   public async play() {
+    // Check if custom audio URL is provided
+    const audioUrl = CUSTOM_WEDDING_AUDIO_URL || this.currentScore.audioDataUrl;
+    if (audioUrl) {
+      if (!this.htmlAudio) {
+        this.htmlAudio = new Audio(audioUrl);
+        this.htmlAudio.loop = true;
+      }
+      this.htmlAudio.volume = this.volume;
+      this.htmlAudio.play().catch(() => {});
+      this.isPlaying = true;
+      this.onStateChange?.(true, 0.5);
+      return;
+    }
+
     this.initContext();
     if (!this.ctx) return;
 
@@ -364,6 +397,9 @@ export class WeddingAudioPlayer {
 
   public pause() {
     this.isPlaying = false;
+    if (this.htmlAudio) {
+      this.htmlAudio.pause();
+    }
     if (this.ctx) {
       this.pauseOffset = (this.ctx.currentTime - this.startTime) % this.loopDuration;
       this.ctx.suspend();
@@ -389,6 +425,10 @@ export class WeddingAudioPlayer {
 
   public destroy() {
     this.pause();
+    if (this.htmlAudio) {
+      this.htmlAudio.pause();
+      this.htmlAudio = null;
+    }
     if (this.ctx) {
       this.ctx.close();
       this.ctx = null;

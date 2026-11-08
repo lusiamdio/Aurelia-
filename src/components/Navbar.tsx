@@ -24,10 +24,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-colors duration-300 ${
+      className={`sticky top-0 z-50 transition-colors duration-300 shadow-sm ${
         isHeroLanding
-          ? 'bg-[#1C1B18]/85 backdrop-blur-md border-b border-white/15 text-[#FAF7F0]'
-          : 'bg-[#FAF7F0]/95 backdrop-blur-md border-b border-[#B59A72]/20 text-[#292722]'
+          ? 'bg-[#1C1B18]/90 backdrop-blur-md text-[#FAF7F0]'
+          : 'bg-[#FAF7F0]/95 backdrop-blur-md text-[#292722]'
       }`}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-6 px-4 sm:px-6 lg:px-8 h-18">
@@ -43,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {isCoupleAdmin && (
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase font-mono tracking-wider font-semibold bg-[#8C6D45]/15 text-[#8C6D45] border border-[#8C6D45]/30">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] uppercase font-mono tracking-wider font-semibold bg-[#8C6D45]/15 text-[#8C6D45] shadow-xs">
               <ShieldCheck className="w-3 h-3 text-[#8C6D45]" />
               Couple Admin
             </span>
@@ -129,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
               <button
                 onClick={onLogoutAdmin}
-                className="p-2 border border-[#B59A72]/40 rounded-xs text-neutral-600 hover:text-rose-700 hover:border-rose-300 transition-colors"
+                className="p-2.5 bg-black/5 hover:bg-rose-50 text-neutral-600 hover:text-rose-700 rounded-xs transition-colors shadow-xs"
                 title="Sign out of Couple Admin"
               >
                 <LogOut className="w-4 h-4" />
@@ -153,15 +153,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Links */}
       <div
-        className={`flex md:hidden overflow-x-auto px-4 py-2 border-t gap-4 text-[11px] uppercase tracking-wider ${
+        className={`flex md:hidden overflow-x-auto px-4 py-2 gap-4 text-[11px] uppercase tracking-wider scrollbar-none shadow-xs ${
           isHeroLanding
-            ? 'border-white/10 text-[#FAF7F0]/80'
-            : 'border-[#B59A72]/15 text-[#292722]/80'
+            ? 'bg-black/30 text-[#FAF7F0]/80'
+            : 'bg-[#EFEAE2]/60 text-[#292722]/80'
         }`}
       >
         <button
           onClick={() => onNavigate('microsite')}
-          className={`whitespace-nowrap shrink-0 ${
+          className={`min-h-[44px] flex items-center whitespace-nowrap shrink-0 py-2 ${
             currentView === 'microsite' ? 'font-bold text-[#8C6D45]' : ''
           }`}
         >
@@ -171,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <>
             <button
               onClick={() => onNavigate('studio')}
-              className={`whitespace-nowrap shrink-0 ${
+              className={`min-h-[44px] flex items-center whitespace-nowrap shrink-0 py-2 ${
                 currentView === 'studio' ? 'font-bold text-[#8C6D45]' : ''
               }`}
             >
@@ -179,20 +179,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => onNavigate('dashboard')}
-              className={`whitespace-nowrap shrink-0 ${
+              className={`min-h-[44px] flex items-center whitespace-nowrap shrink-0 py-2 ${
                 currentView === 'dashboard' ? 'font-bold text-[#8C6D45]' : ''
               }`}
             >
               Dashboard
             </button>
-            <button onClick={onLogoutAdmin} className="whitespace-nowrap shrink-0 text-rose-700">
+            <button onClick={onLogoutAdmin} className="min-h-[44px] flex items-center whitespace-nowrap shrink-0 py-2 text-rose-700 font-semibold">
               Sign Out
             </button>
           </>
         ) : (
           <button
             onClick={onOpenCoupleLogin}
-            className="whitespace-nowrap shrink-0 text-[#8C6D45] font-semibold"
+            className="min-h-[44px] flex items-center whitespace-nowrap shrink-0 py-2 text-[#8C6D45] font-semibold"
           >
             Couple Sign In
           </button>

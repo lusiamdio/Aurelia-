@@ -190,7 +190,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
           </button>
           <button
             onClick={onExploreClick}
-            className="w-full sm:w-auto px-8 py-4 bg-white/10 hover:bg-white/20 text-[#FAF7F0] backdrop-blur-md border border-white/30 text-xs font-semibold tracking-[0.18em] uppercase rounded-xs transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap"
+            className="w-full sm:w-auto px-8 py-4 bg-white/15 hover:bg-white/25 text-[#FAF7F0] backdrop-blur-md shadow-lg text-xs font-semibold tracking-[0.18em] uppercase rounded-xs transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]"
           >
             <span>Explore how it works</span>
             <span className="text-[#D4AF37]">→</span>
@@ -198,7 +198,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
         </div>
 
         {/* Subtle Feature Indicators */}
-        <div className="mt-12 flex items-center gap-4 sm:gap-8 text-[11px] uppercase tracking-widest text-[#F3EDE2]/70 font-sans-ui">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-3 sm:gap-8 text-[10px] sm:text-[11px] uppercase tracking-widest text-[#F3EDE2]/70 font-sans-ui max-w-xl">
           <span>Curated Suites</span>
           <span className="opacity-40">·</span>
           <span>Guest Plus-One Concierge</span>
@@ -212,7 +212,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
       <button
         onClick={prevSlide}
         aria-label="Previous wedding slide"
-        className="absolute left-4 sm:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/25 hover:bg-black/50 text-[#FAF7F0] backdrop-blur-md border border-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
+        className="absolute left-3 sm:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/35 hover:bg-black/60 text-[#FAF7F0] backdrop-blur-md shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
@@ -221,7 +221,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
       <button
         onClick={nextSlide}
         aria-label="Next wedding slide"
-        className="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/25 hover:bg-black/50 text-[#FAF7F0] backdrop-blur-md border border-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
+        className="absolute right-3 sm:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/35 hover:bg-black/60 text-[#FAF7F0] backdrop-blur-md shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
       >
         <ChevronRight className="w-5 h-5" />
       </button>

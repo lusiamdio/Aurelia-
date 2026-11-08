@@ -19,7 +19,7 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
   const [selectedPreview, setSelectedPreview] = useState<InvitationStyleMeta | null>(null);
 
   return (
-    <section id="invitation-designs" className="py-20 lg:py-28 bg-[#EFEAE2]/60 border-y border-[#B59A72]/20">
+    <section id="invitation-designs" className="py-20 lg:py-28 bg-[#EFEAE2]/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -41,10 +41,10 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
             return (
               <div
                 key={style.id}
-                className={`bg-[#FAF7F0] rounded-sm overflow-hidden border transition-all duration-300 flex flex-col group ${
+                className={`bg-[#FAF7F0] rounded-sm overflow-hidden transition-all duration-300 flex flex-col group ${
                   isSelected
-                    ? 'border-[#8C6D45] ring-2 ring-[#8C6D45]/30 shadow-xl'
-                    : 'border-[#B59A72]/30 hover:border-[#8C6D45]/60 hover:shadow-lg'
+                    ? 'ring-2 ring-[#8C6D45]/40 shadow-2xl scale-[1.01]'
+                    : 'shadow-md hover:shadow-xl'
                 }`}
               >
                 {/* Image Showcase */}
@@ -58,7 +58,7 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
                   <div className="absolute inset-0 bg-gradient-to-t from-[#292722]/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                     <button
                       onClick={() => setSelectedPreview(style)}
-                      className="w-full py-2 bg-white/90 backdrop-blur-xs text-[#292722] text-xs uppercase tracking-wider font-semibold rounded-xs hover:bg-white flex items-center justify-center gap-1.5 transition-colors"
+                      className="w-full py-2 bg-white/90 backdrop-blur-xs text-[#292722] text-xs uppercase tracking-wider font-semibold rounded-xs hover:bg-white flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5 text-[#8C6D45]" />
                       Inspect Suite Details
@@ -89,13 +89,13 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="mt-6 pt-4 border-t border-[#B59A72]/20 flex items-center justify-between gap-2">
+                  <div className="mt-6 pt-4 flex items-center justify-between gap-2">
                     <button
                       onClick={() => {
                         onSelectStyle(style.id);
                         onJumpToGenerator(style.id);
                       }}
-                      className="text-xs font-semibold uppercase tracking-wider text-[#292722] hover:text-[#8C6D45] flex items-center gap-1 transition-colors"
+                      className="text-xs font-semibold uppercase tracking-wider text-[#292722] hover:text-[#8C6D45] flex items-center gap-1 transition-colors min-h-[44px]"
                     >
                       <span>Try in Generator</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -105,7 +105,7 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
                         onSelectStyle(style.id);
                         onOpenStudio();
                       }}
-                      className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider bg-[#292722]/5 hover:bg-[#292722] hover:text-white rounded-xs transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider bg-[#292722]/5 hover:bg-[#292722] hover:text-white rounded-xs transition-colors min-h-[44px]"
                     >
                       Customize
                     </button>
@@ -119,16 +119,16 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
         {/* Modal for Inspecting Suite */}
         {selectedPreview && (
           <div className="fixed inset-0 z-50 bg-[#292722]/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#FAF7F0] rounded-sm max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-[#B59A72]/50 shadow-2xl p-6 sm:p-8 relative">
+            <div className="bg-[#FAF7F0] rounded-sm max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8 relative">
               <button
                 onClick={() => setSelectedPreview(null)}
-                className="absolute top-4 right-4 text-[#292722]/60 hover:text-[#292722] text-xl font-mono"
+                className="absolute top-4 right-4 text-[#292722]/60 hover:text-[#292722] text-xl font-mono min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 ✕
               </button>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                <div className="rounded-sm overflow-hidden border border-[#B59A72]/30 shadow-md">
+                <div className="rounded-sm overflow-hidden shadow-md">
                   <img
                     src={selectedPreview.image}
                     alt={selectedPreview.name}
@@ -151,7 +151,7 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
                     {selectedPreview.description}
                   </p>
 
-                  <div className="mt-6 space-y-2 text-xs border-y border-[#B59A72]/20 py-4">
+                  <div className="mt-6 space-y-2 text-xs bg-black/5 rounded-xs p-4">
                     <div className="flex justify-between">
                       <span className="text-neutral-500">Typography Suite:</span>
                       <span className="font-semibold">{selectedPreview.fontCategory}</span>
@@ -173,13 +173,13 @@ export const InvitationCollections: React.FC<InvitationCollectionsProps> = ({
                         onJumpToGenerator(selectedPreview.id);
                         setSelectedPreview(null);
                       }}
-                      className="flex-1 py-2.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors"
+                      className="flex-1 py-3 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors min-h-[44px]"
                     >
                       Use This Template
                     </button>
                     <button
                       onClick={() => setSelectedPreview(null)}
-                      className="px-4 py-2.5 border border-[#B59A72]/40 text-[#292722] text-xs font-semibold uppercase tracking-wider rounded-xs hover:bg-[#292722]/5 transition-colors"
+                      className="px-4 py-3 bg-black/5 text-[#292722] text-xs font-semibold uppercase tracking-wider rounded-xs hover:bg-black/10 transition-colors min-h-[44px]"
                     >
                       Close
                     </button>
