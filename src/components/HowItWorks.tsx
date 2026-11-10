@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Share2, UserCheck, ShieldCheck, Download, Smartphone } from 'lucide-react';
+import { Heart, Share2, UserCheck, ShieldCheck, Download, Smartphone } from 'lucide-react';
 
 export const HowItWorks: React.FC<{
   onCreateClick: () => void;
@@ -10,7 +10,7 @@ export const HowItWorks: React.FC<{
       title: 'Couple Creates Wedding Page',
       subtitle: 'Profiles, venues, itinerary & dress code',
       desc: 'Set your partner names, dates, bespoke message, photos, multi-event schedules (Cocktails, Church, Banquet, Brunch), and custom microsite URL.',
-      icon: Sparkles
+      icon: Heart
     },
     {
       num: '02',

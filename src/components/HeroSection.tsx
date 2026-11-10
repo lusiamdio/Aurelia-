@@ -18,30 +18,48 @@ interface CarouselSlide {
 
 const SLIDES: CarouselSlide[] = [
   {
-    id: 'garden-romance',
+    id: 'hero-1',
     slideNumber: '01',
-    theme: 'Garden Romance',
+    theme: 'Two Hearts, One Story',
     quote: 'Every love story deserves a beautiful beginning.',
-    image: '/src/assets/images/hero_garden_romance_1793530329497.jpg',
-    alt: 'Romantic couple in luxury English garden beneath blooming white rose arches',
+    image: '/src/assets/images/IMG-20261107-WA0121.jpg',
+    alt: 'Wedding celebration couple portrait',
     focalPoint: 'object-center'
   },
   {
-    id: 'golden-hour',
+    id: 'hero-2',
     slideNumber: '02',
-    theme: 'Golden Hour',
+    theme: 'Eternal Devotion',
     quote: 'A moment worth celebrating forever.',
-    image: '/src/assets/images/hero_golden_hour_1793530329379.jpg',
-    alt: 'Diverse couple embracing on sun-drenched coastal cliff at golden hour',
+    image: '/src/assets/images/IMG-20261107-WA0131.jpg',
+    alt: 'Romantic wedding couple embrace',
     focalPoint: 'object-center'
   },
   {
-    id: 'timeless-elegance',
+    id: 'hero-3',
     slideNumber: '03',
     theme: 'Timeless Elegance',
-    quote: 'Make your special day unforgettable.',
-    image: '/src/assets/images/hero_timeless_elegance_1793530427405.jpg',
-    alt: 'Black-tie bride and groom dancing in a magnificent candlelit historic ballroom',
+    quote: 'United in love, guided by faith.',
+    image: '/src/assets/images/IMG-20261107-WA0132.jpg',
+    alt: 'Joyful wedding couple moment',
+    focalPoint: 'object-center'
+  },
+  {
+    id: 'hero-4',
+    slideNumber: '04',
+    theme: 'A Sacred Chapter',
+    quote: 'What God has joined together, let no one separate.',
+    image: '/src/assets/images/IMG-20261107-WA0136.jpg',
+    alt: 'Elegant wedding couple portrait',
+    focalPoint: 'object-center'
+  },
+  {
+    id: 'hero-5',
+    slideNumber: '05',
+    theme: 'The Journey to Forever',
+    quote: 'Two souls, one destiny, infinite love.',
+    image: '/src/assets/images/IMG-20261107-WA0155.jpg',
+    alt: 'Beautiful couple celebrating their union',
     focalPoint: 'object-center'
   }
 ];
@@ -179,18 +197,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
           Beautifully designed wedding invitations, personalized for every guest and delivered with love.
         </p>
 
-        {/* Glassmorphic Minimalist CTAs */}
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
+        {/* Glassmorphic Minimalist CTAs - Refined Luxury Sizing */}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
           <button
             onClick={onCreateClick}
-            className="w-full sm:w-auto px-8 py-4 bg-[#FAF7F0] hover:bg-white text-[#292722] text-xs font-semibold tracking-[0.18em] uppercase rounded-xs transition-all duration-200 shadow-xl flex items-center justify-center gap-2.5 hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+            className="w-full sm:w-auto px-6 py-2.5 bg-[#FAF7F0] hover:bg-white text-[#292722] text-[11px] font-semibold tracking-[0.18em] uppercase rounded-xs transition-all duration-200 shadow-md flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
           >
             <span>Create your invitation</span>
-            <ArrowRight className="w-4 h-4 text-[#8C6D45]" />
+            <ArrowRight className="w-3.5 h-3.5 text-[#8C6D45]" />
           </button>
           <button
             onClick={onExploreClick}
-            className="w-full sm:w-auto px-8 py-4 bg-white/15 hover:bg-white/25 text-[#FAF7F0] backdrop-blur-md shadow-lg text-xs font-semibold tracking-[0.18em] uppercase rounded-xs transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap min-h-[44px]"
+            className="w-full sm:w-auto px-6 py-2.5 bg-white/15 hover:bg-white/25 text-[#FAF7F0] backdrop-blur-md shadow-sm text-[11px] font-semibold tracking-[0.18em] uppercase rounded-xs transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap"
           >
             <span>Explore how it works</span>
             <span className="text-[#D4AF37]">→</span>
@@ -198,7 +216,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
         </div>
 
         {/* Subtle Feature Indicators */}
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-3 sm:gap-8 text-[10px] sm:text-[11px] uppercase tracking-widest text-[#F3EDE2]/70 font-sans-ui max-w-xl">
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-[9px] sm:text-[10px] uppercase tracking-widest text-[#F3EDE2]/70 font-sans-ui max-w-xl">
           <span>Curated Suites</span>
           <span className="opacity-40">·</span>
           <span>Guest Plus-One Concierge</span>
@@ -207,23 +225,23 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onCreateClick, onExplo
         </div>
       </div>
 
-      {/* 4. Glassmorphic Navigation Controls & Arrows */}
+      {/* 4. Glassmorphic Navigation Controls & Arrows - Smaller Compact Scale */}
       {/* Left Arrow */}
       <button
         onClick={prevSlide}
         aria-label="Previous wedding slide"
-        className="absolute left-3 sm:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/35 hover:bg-black/60 text-[#FAF7F0] backdrop-blur-md shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
+        className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-black/35 hover:bg-black/60 text-[#FAF7F0] backdrop-blur-md shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
       >
-        <ChevronLeft className="w-5 h-5" />
+        <ChevronLeft className="w-4 h-4" />
       </button>
 
       {/* Right Arrow */}
       <button
         onClick={nextSlide}
         aria-label="Next wedding slide"
-        className="absolute right-3 sm:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/35 hover:bg-black/60 text-[#FAF7F0] backdrop-blur-md shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
+        className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-9 h-9 rounded-full bg-black/35 hover:bg-black/60 text-[#FAF7F0] backdrop-blur-md shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
       >
-        <ChevronRight className="w-5 h-5" />
+        <ChevronRight className="w-4 h-4" />
       </button>
 
       {/* 5. Bottom Pagination Strip with Animated Progress */}

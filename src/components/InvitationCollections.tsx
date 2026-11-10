@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { INVITATION_STYLES } from '../data/mockWedding';
 import { InvitationStyle, InvitationStyleMeta } from '../types/wedding';
-import { Sparkles, ArrowRight, Eye, Check } from 'lucide-react';
+import { ArrowRight, Eye, Check } from 'lucide-react';
 
 interface InvitationCollectionsProps {
   currentStyle: InvitationStyle;

@@ -11,7 +11,6 @@ import { CoupleDashboard } from './components/CoupleDashboard';
 import { WeddingMicrosite } from './components/WeddingMicrosite';
 import { EmailPreviewModal } from './components/EmailPreviewModal';
 import { CoupleAuthModal } from './components/CoupleAuthModal';
-import { AureliaAiAssistant } from './components/AureliaAiAssistant';
 import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
 import { Check, ShieldAlert } from 'lucide-react';
@@ -315,19 +314,6 @@ export default function App() {
         onAuthenticated={handleAuthenticated}
       />
 
-      {/* Aurelia Floating AI Concierge & Vows Stylist */}
-      <AureliaAiAssistant
-        wedding={wedding}
-        onApplyWording={(headline, story) => {
-          setWedding((prev) => ({
-            ...prev,
-            headline,
-            storyMessage: story
-          }));
-          setGlobalNotification('AI wording successfully applied to wedding invitation suite!');
-          setTimeout(() => setGlobalNotification(null), 3000);
-        }}
-      />
 
       {/* Email Delivery Preview Modal */}
       {emailPreviewGuest && (

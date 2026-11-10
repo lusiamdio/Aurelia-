@@ -13,7 +13,6 @@ import {
 import { INVITATION_STYLES } from '../data/mockWedding';
 import { InvitationCardPreview } from './InvitationCardPreview';
 import {
-  Sparkles,
   Check,
   ArrowLeft,
   Globe,
@@ -65,10 +64,10 @@ export const CoupleStudio: React.FC<CoupleStudioProps> = ({
 
   // Pre-loaded photography options for couple
   const couplePhotoPresets = [
-    { label: 'Golden Hour Cliffside', url: '/src/assets/images/hero_golden_hour_1793530329379.jpg' },
-    { label: 'Rose Garden Arch', url: '/src/assets/images/hero_garden_romance_1793530329497.jpg' },
-    { label: 'Architectural Ballroom', url: '/src/assets/images/hero_timeless_elegance_1793530427405.jpg' },
-    { label: 'Tuscan Estate Terrace', url: '/src/assets/images/hero_wedding_editorial_1793528713583.jpg' }
+    { label: 'Golden Hour Celebration', url: '/src/assets/images/IMG-20261107-WA0121.jpg' },
+    { label: 'Eternal Romance', url: '/src/assets/images/IMG-20261107-WA0131.jpg' },
+    { label: 'Timeless Union', url: '/src/assets/images/IMG-20261107-WA0132.jpg' },
+    { label: 'Sacred Benediction', url: '/src/assets/images/IMG-20261107-WA0136.jpg' }
   ];
 
   const handleStyleChange = (styleId: InvitationStyle) => {
@@ -1006,7 +1005,7 @@ export const CoupleStudio: React.FC<CoupleStudioProps> = ({
                         disabled={isAiWordingLoading}
                         className="px-2 py-0.5 bg-[#FAF7F0] border border-[#B59A72]/40 hover:bg-[#8C6D45] hover:text-white rounded-xs text-[10px] font-medium text-[#8C6D45] transition-colors flex items-center gap-1"
                       >
-                        <Sparkles className="w-2.5 h-2.5" />
+                        <Heart className="w-2.5 h-2.5" />
                         <span>Poetic</span>
                       </button>
                       <button

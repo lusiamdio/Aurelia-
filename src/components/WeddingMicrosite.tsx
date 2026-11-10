@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { WeddingData, GuestInvitation, SongRequest } from '../types/wedding';
 import { InvitationCardPreview } from './InvitationCardPreview';
-import { WeddingAudioPlayer, TURKISH_MARCH_SCORE } from '../utils/weddingAudioSynthesizer';
+import { WeddingAudioPlayer } from '../utils/weddingAudioSynthesizer';
 import {
   Calendar,
   MapPin,
   Clock,
   Heart,
-  Sparkles,
   ArrowLeft,
   Download,
   MessageSquare,
@@ -16,10 +15,6 @@ import {
   ChevronRight,
   ChevronDown,
   Music,
-  Volume2,
-  VolumeX,
-  Play,
-  Pause,
   ExternalLink,
   Gift,
   Crown,
@@ -28,18 +23,11 @@ import {
   X,
   Menu,
   Layers,
-  LayoutGrid,
-  Disc3,
-  Send,
-  ThumbsUp,
-  Flame,
-  Radio,
-  Headphones,
-  ListMusic,
-  Music2
+  LayoutGrid
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MotionPhotoCardStack } from './MotionPhotoCardStack';
+import { OpeningInvitationExperience } from './OpeningInvitationExperience';
 
 interface WeddingMicrositeProps {
   wedding: WeddingData;
@@ -121,60 +109,101 @@ const ScrollPopPhoto: React.FC<ScrollPopPhotoProps> = ({
 const JOURNEY_GALLERY_PHOTOS = [
   {
     id: 'jp-1',
-    src: '/src/assets/images/hero_wedding_editorial_1793528713583.jpg',
+    src: '/src/assets/images/IMG-20261107-WA0121.jpg',
     aspect: 'aspect-4/5'
   },
   {
     id: 'jp-2',
-    src: '/src/assets/images/hero_golden_hour_1793530329379.jpg',
+    src: '/src/assets/images/IMG-20261107-WA0131.jpg',
     aspect: 'aspect-3/4'
   },
   {
     id: 'jp-3',
-    src: '/src/assets/images/hero_garden_romance_1793530329497.jpg',
+    src: '/src/assets/images/IMG-20261107-WA0132.jpg',
     aspect: 'aspect-4/5'
   },
   {
     id: 'jp-4',
-    src: '/src/assets/images/concierge_bride_portrait_1793535647180.jpg',
+    src: '/src/assets/images/IMG-20261107-WA0136.jpg',
     aspect: 'aspect-3/4'
   },
   {
     id: 'jp-5',
-    src: '/src/assets/images/concierge_groom_portrait_1793535647794.jpg',
-    aspect: 'aspect-3/4'
+    src: '/src/assets/images/IMG-20261107-WA0155.jpg',
+    aspect: 'aspect-4/5'
   },
   {
     id: 'jp-6',
-    src: '/src/assets/images/hero_timeless_elegance_1793530427405.jpg',
+    src: '/src/assets/images/IMG-20261107-WA0165.jpg',
+    aspect: 'aspect-3/4'
+  },
+  {
+    id: 'jp-7',
+    src: '/src/assets/images/IMG-20261107-WA0166.jpg',
+    aspect: 'aspect-4/5'
+  },
+  {
+    id: 'jp-8',
+    src: '/src/assets/images/IMG-20261107-WA0178.jpg',
+    aspect: 'aspect-3/4'
+  },
+  {
+    id: 'jp-9',
+    src: '/src/assets/images/IMG-20261107-WA0179.jpg',
+    aspect: 'aspect-4/5'
+  },
+  {
+    id: 'jp-10',
+    src: '/src/assets/images/IMG-20261107-WA0180.jpg',
+    aspect: 'aspect-3/4'
+  },
+  {
+    id: 'jp-11',
+    src: '/src/assets/images/IMG-20261107-WA0181.jpg',
+    aspect: 'aspect-4/5'
+  },
+  {
+    id: 'jp-12',
+    src: '/src/assets/images/IMG-20261108-WA0008.jpg',
+    aspect: 'aspect-3/4'
+  },
+  {
+    id: 'jp-13',
+    src: '/src/assets/images/IMG-20261108-WA0009.jpg',
     aspect: 'aspect-4/5'
   }
 ];
 
 const MICROSITE_SLIDES = [
   {
-    id: 'slide-editorial',
-    title: 'Editorial Ceremony',
+    id: 'slide-1',
+    title: 'Two Hearts, One Story',
     quote: 'Two Hearts, One Beautiful Story.',
-    image: '/src/assets/images/hero_wedding_editorial_1793528713583.jpg'
+    image: '/src/assets/images/IMG-20261107-WA0121.jpg'
   },
   {
-    id: 'slide-garden',
-    title: 'Garden Romance',
+    id: 'slide-2',
+    title: 'Eternal Devotion',
     quote: 'Every love story deserves a beautiful beginning.',
-    image: '/src/assets/images/hero_garden_romance_1793530329497.jpg'
+    image: '/src/assets/images/IMG-20261107-WA0131.jpg'
   },
   {
-    id: 'slide-golden',
-    title: 'Golden Hour Vows',
-    quote: 'A moment worth celebrating forever.',
-    image: '/src/assets/images/hero_golden_hour_1793530329379.jpg'
-  },
-  {
-    id: 'slide-grand',
+    id: 'slide-3',
     title: 'Timeless Elegance',
-    quote: 'Make your special day unforgettable.',
-    image: '/src/assets/images/hero_timeless_elegance_1793530427405.jpg'
+    quote: 'A moment worth celebrating forever.',
+    image: '/src/assets/images/IMG-20261107-WA0132.jpg'
+  },
+  {
+    id: 'slide-4',
+    title: 'A Sacred Chapter',
+    quote: 'What God has joined together, let no one separate.',
+    image: '/src/assets/images/IMG-20261107-WA0136.jpg'
+  },
+  {
+    id: 'slide-5',
+    title: 'The Journey to Forever',
+    quote: 'Make our special day unforgettable.',
+    image: '/src/assets/images/IMG-20261107-WA0155.jpg'
   }
 ];
 
@@ -184,10 +213,8 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   onGuestRegistered,
   onSongRequested
 }) => {
-  // Opening Interactive Animated Sequence State (Stays for 10 seconds)
-  const [openingStage, setOpeningStage] = useState<'initial' | 'names' | 'complete'>('initial');
+  // Opening Interactive Animated Sequence State (Managed by OpeningInvitationExperience)
   const [showOpeningOverlay, setShowOpeningOverlay] = useState(true);
-  const [overlayCountdown, setOverlayCountdown] = useState(10);
 
   // High-Resolution Lightbox View State
   const [selectedLightboxPhoto, setSelectedLightboxPhoto] = useState<string | null>(null);
@@ -203,10 +230,10 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
   const [, setCarouselProgress] = useState(0);
 
-  // Audio Atmosphere State (Mozart Turkish March)
+  // Audio Atmosphere State (Number One - Romantic Wedding Song)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const audioPlayerRef = useRef<WeddingAudioPlayer | null>(null);
-  const [songVolume, setSongVolume] = useState(0.65);
+  const [songVolume, setSongVolume] = useState(0.7);
   const [hasInteractedAudio, setHasInteractedAudio] = useState(false);
 
   // Countdown timer to wedding date (Sunday, 20th December 2026)
@@ -222,57 +249,18 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const [attendance, setAttendance] = useState<'attending' | 'declined'>('attending');
   const [generatedPass, setGeneratedPass] = useState<GuestInvitation | null>(null);
 
-  // Song Requests state (starts empty)
-  const [songList, setSongList] = useState<SongRequest[]>(
-    wedding.songRequests || []
-  );
-  const [newSongTitle, setNewSongTitle] = useState('');
-  const [newSongArtist, setNewSongArtist] = useState('');
-  const [newSongGuest, setNewSongGuest] = useState('');
-  const [newSongEnergy, setNewSongEnergy] = useState<'party-anthem' | 'high-energy' | 'mid-tempo' | 'chill'>('party-anthem');
-  const [newSongNotes, setNewSongNotes] = useState('');
-  const [songToast, setSongToast] = useState<string | null>(null);
-  const [upvotedSongIds, setUpvotedSongIds] = useState<Record<string, boolean>>({});
-
   // Active FAQ
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   // Touch handling for mobile swipe
   const touchStartX = useRef<number | null>(null);
 
-  // 1. Initial Animated Opening Experience Sequence (Stays for 10 seconds)
-  useEffect(() => {
-    // Stage 1: Reveal names after 1.2s
-    const tNames = setTimeout(() => {
-      setOpeningStage('names');
-    }, 1200);
-
-    // 10-second countdown ticker
-    const timer = setInterval(() => {
-      setOverlayCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setOpeningStage('complete');
-          setTimeout(() => setShowOpeningOverlay(false), 900);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      clearTimeout(tNames);
-      clearInterval(timer);
-    };
-  }, []);
-
-  // 2. Initialize Mozart Turkish March Audio Atmosphere
+  // 2. Initialize Number One Wedding Audio Atmosphere
   useEffect(() => {
     if (!audioPlayerRef.current) {
       audioPlayerRef.current = new WeddingAudioPlayer((playing) => {
         setIsPlayingAudio(playing);
       });
-      audioPlayerRef.current.loadScore(TURKISH_MARCH_SCORE);
       audioPlayerRef.current.setVolume(songVolume);
     }
 
@@ -315,7 +303,6 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
       audioPlayerRef.current = new WeddingAudioPlayer((playing) => {
         setIsPlayingAudio(playing);
       });
-      audioPlayerRef.current.loadScore(TURKISH_MARCH_SCORE);
       audioPlayerRef.current.setVolume(songVolume);
     }
     audioPlayerRef.current.toggle();
@@ -323,16 +310,8 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   };
 
   const handleDismissOverlay = () => {
-    setOpeningStage('complete');
     setShowOpeningOverlay(false);
     handleToggleAudio();
-  };
-
-  const handleVolumeChange = (newVol: number) => {
-    setSongVolume(newVol);
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.setVolume(newVol);
-    }
   };
 
   const nextSlide = useCallback(() => {
@@ -421,155 +400,24 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
     }
   };
 
-  const handleAddSong = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSongTitle.trim() || !newSongArtist.trim()) return;
-
-    const newSong: SongRequest = {
-      id: `song-${Date.now()}`,
-      songTitle: newSongTitle.trim(),
-      artist: newSongArtist.trim(),
-      guestName: newSongGuest.trim() || 'A Wedding Guest',
-      danceEnergy: newSongEnergy,
-      notes: newSongNotes.trim() || undefined,
-      status: 'pending',
-      requestedAt: 'Just now',
-      votes: 1
-    };
-
-    setSongList([newSong, ...songList]);
-    if (onSongRequested) {
-      onSongRequested(newSong);
-    }
-    setNewSongTitle('');
-    setNewSongArtist('');
-    setNewSongGuest('');
-    setNewSongNotes('');
-    setNewSongEnergy('party-anthem');
-    setSongToast(`"${newSong.songTitle}" by ${newSong.artist} has been added to the DJ celebration queue!`);
-    try {
-      confetti({
-        particleCount: 35,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#D4AF37', '#B59A72', '#FAF7F0']
-      });
-    } catch {
-      // ignore
-    }
-    setTimeout(() => setSongToast(null), 4500);
-  };
-
-  const handleToggleUpvote = (songId: string) => {
-    const isCurrentlyUpvoted = !!upvotedSongIds[songId];
-    setUpvotedSongIds((prev) => ({
-      ...prev,
-      [songId]: !isCurrentlyUpvoted
-    }));
-    setSongList((prev) =>
-      prev.map((s) => {
-        if (s.id !== songId) return s;
-        const currentVotes = s.votes || 1;
-        return {
-          ...s,
-          votes: isCurrentlyUpvoted ? Math.max(1, currentVotes - 1) : currentVotes + 1
-        };
-      })
-    );
-  };
-
   return (
     <div className="min-h-screen bg-[#F3EDE2] text-[#292722] selection:bg-[#B59A72]/20 font-sans relative">
-      {/* 0. INTERACTIVE LUXURY OPENING EXPERIENCE OVERLAY (STAYS FOR 10 SECONDS WITH COUPLE PHOTO IN THE GROUND) */}
+      {/* 0. INTERACTIVE 3D ENVELOPE OPENING EXPERIENCE ("THE INVITATION" WITH IMG-20261107-WA0181) */}
       {showOpeningOverlay && (
-        <div
-          className={`fixed inset-0 z-100 flex flex-col items-center justify-center bg-[#1C1B18] text-[#FAF7F0] transition-opacity duration-1000 ${
-            openingStage === 'complete' ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          }`}
-        >
-          {/* Couple Photograph in the ground (Full-bleed Background with Cinematic Scrims) */}
-          <div className="absolute inset-0 z-0 overflow-hidden">
-            <img
-              src="/src/assets/images/hero_wedding_editorial_1793528713583.jpg"
-              alt={`${wedding.partner1} & ${wedding.partner2}`}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-center scale-105 transition-transform duration-10000 ease-out"
-            />
-            {/* Measured contrast scrims */}
-            <div className="absolute inset-0 bg-[#1C1B18]/70 backdrop-blur-[2px]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#1C1B18] via-[#1C1B18]/65 to-[#1C1B18]/50" />
-            <div className="absolute inset-0 bg-radial from-transparent via-[#1C1B18]/45 to-[#1C1B18]/90" />
-          </div>
-
-          <div className="relative z-10 text-center px-6 max-w-xl mx-auto flex flex-col items-center">
-            {/* Step 1: Monogram Crest with golden glow */}
-            <div
-              className={`w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl bg-[#D4AF37]/20 text-[#D4AF37] backdrop-blur-md transition-all duration-1000 transform ${
-                openingStage !== 'initial' ? 'scale-100 opacity-100' : 'scale-90 opacity-80'
-              }`}
-            >
-              <span className="font-editorial text-2xl italic tracking-wider text-[#D4AF37]">
-                {wedding.monogram || 'S & K'}
-              </span>
-            </div>
-
-            <p
-              className={`text-[11px] font-editorial uppercase tracking-[0.35em] text-[#D4AF37] font-semibold mb-2 transition-all duration-700 delay-200 ${
-                openingStage !== 'initial' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-              }`}
-            >
-              Together with their families
-            </p>
-
-            <p className="font-editorial italic text-sm sm:text-base text-[#F3EDE2]/85 mb-2">
-              Two Hearts, One Beautiful Story
-            </p>
-
-            <h1
-              className={`font-editorial text-3xl sm:text-4xl lg:text-5xl font-normal text-[#FAF7F0] tracking-tight transition-all duration-1000 delay-300 ${
-                openingStage !== 'initial' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-              }`}
-            >
-              {wedding.partner1}
-              <span className="block italic text-2xl sm:text-3xl my-1 text-[#D4AF37] font-light">&amp;</span>
-              {wedding.partner2}
-            </h1>
-
-            <p className="font-editorial italic text-xs sm:text-sm text-[#D4AF37] mt-3 tracking-wide max-w-md mx-auto">
-              &ldquo;Therefore what God has joined together, let no one separate.&rdquo; — Mark 10:9
-            </p>
-
-            <p
-              className={`text-xs font-mono uppercase tracking-[0.25em] text-neutral-300 mt-4 transition-all duration-700 delay-500 ${
-                openingStage !== 'initial' ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              20 · 12 · 2026 · Cape Town
-            </p>
-
-            {/* 10-Second Progress Indicator */}
-            <div className="mt-8 w-full max-w-xs flex flex-col items-center gap-2">
-              <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden backdrop-blur-xs">
-                <div
-                  className="bg-[#D4AF37] h-full transition-all duration-1000 ease-linear rounded-full shadow-md"
-                  style={{ width: `${Math.min(100, Math.max(0, ((10 - overlayCountdown) / 10) * 100))}%` }}
-                />
-              </div>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#D4AF37]/90">
-                Opening celebration in {overlayCountdown}s
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleDismissOverlay}
-              className="mt-6 px-6 py-2.5 bg-[#D4AF37] text-[#1C1B18] text-xs font-semibold uppercase tracking-[0.2em] rounded-xs shadow-lg hover:bg-[#8C6D45] hover:text-white transition-all flex items-center gap-2"
-            >
-              <span>Enter Celebration</span>
-              <Sparkles className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        <OpeningInvitationExperience
+          wedding={wedding}
+          onComplete={() => setShowOpeningOverlay(false)}
+          onStartAudio={() => {
+            setHasInteractedAudio(true);
+            if (audioPlayerRef.current && !isPlayingAudio) {
+              audioPlayerRef.current.play().then(() => {
+                setIsPlayingAudio(true);
+              }).catch(() => {});
+            }
+          }}
+          isAudioPlaying={isPlayingAudio}
+          onToggleAudio={handleToggleAudio}
+        />
       )}
 
       {/* Top Floating Microsite Administrative & Minimal Navigation Bar */}
@@ -618,12 +466,6 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             Schedule
           </a>
           <a
-            href="#microsite-music"
-            className="hover:text-[#D4AF37] transition-colors"
-          >
-            Music
-          </a>
-          <a
             href="#microsite-rsvp-section"
             className="hover:text-[#D4AF37] transition-colors text-[#D4AF37] font-semibold"
           >
@@ -636,12 +478,12 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           <button
             type="button"
             onClick={handleToggleAudio}
-            className={`px-3.5 py-2 rounded-full text-[11px] transition-all flex items-center gap-2 min-h-[44px] ${
+            className={`px-3 py-1.5 rounded-full text-[10px] transition-all flex items-center gap-1.5 ${
               isPlayingAudio
-                ? 'bg-[#D4AF37] text-[#1C1B18] font-semibold shadow-md'
-                : 'bg-white/15 text-white/90 hover:bg-white/25 shadow-sm'
+                ? 'bg-[#D4AF37] text-[#1C1B18] font-semibold shadow-sm'
+                : 'bg-white/15 text-white/90 hover:bg-white/25 shadow-xs'
             }`}
-            title="Mozart — Turkish March (Rondo alla Turca, K. 331)"
+            title="Number One — Wedding Song"
           >
             {isPlayingAudio ? (
               <>
@@ -650,13 +492,13 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                   <span className="w-1 h-2 bg-[#1C1B18] animate-ping rounded-full" />
                   <span className="w-1 h-3.5 bg-[#1C1B18] animate-pulse rounded-full" />
                 </div>
-                <span className="hidden sm:inline">Turkish March: Playing</span>
+                <span className="hidden sm:inline">Number One: Playing</span>
                 <span className="sm:hidden">Playing</span>
               </>
             ) : (
               <>
                 <Music className="w-3.5 h-3.5 text-[#D4AF37]" />
-                <span className="hidden sm:inline">Play Turkish March</span>
+                <span className="hidden sm:inline">Play Number One</span>
                 <span className="sm:hidden">Play Song</span>
               </>
             )}
@@ -705,13 +547,6 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
               className="py-3 hover:text-[#D4AF37] transition-colors min-h-[44px] flex items-center justify-center"
             >
               Schedule
-            </a>
-            <a
-              href="#microsite-music"
-              onClick={() => setIsMobileNavOpen(false)}
-              className="py-3 hover:text-[#D4AF37] transition-colors min-h-[44px] flex items-center justify-center"
-            >
-              Music
             </a>
             <a
               href="#microsite-rsvp-section"
@@ -1028,7 +863,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             <div className="bg-[#FAF7F0] p-6 sm:p-7 rounded-2xl shadow-lg text-left">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-full bg-[#8C6D45]/15 text-[#8C6D45] flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4" />
+                  <Crown className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[10px] uppercase tracking-widest text-[#8C6D45] font-mono block">
@@ -1199,7 +1034,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             <div className="hidden lg:flex lg:col-span-3 flex-col items-center text-center">
               <div className="w-full max-w-[220px] aspect-3/4 rounded-t-full overflow-hidden shadow-2xl bg-neutral-100 group relative">
                 <img
-                  src="/src/assets/images/concierge_bride_portrait_1793535647180.jpg"
+                  src="/src/assets/images/IMG-20261107-WA0179.jpg"
                   alt={`The Bride - ${wedding.partner2}`}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
@@ -1225,7 +1060,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="w-12 h-12 rounded-full overflow-hidden shadow-md">
                     <img
-                      src="/src/assets/images/concierge_bride_portrait_1793535647180.jpg"
+                      src="/src/assets/images/IMG-20261107-WA0179.jpg"
                       alt="Bride"
                       className="w-full h-full object-cover"
                     />
@@ -1236,7 +1071,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="w-12 h-12 rounded-full overflow-hidden shadow-md">
                     <img
-                      src="/src/assets/images/concierge_groom_portrait_1793535647794.jpg"
+                      src="/src/assets/images/IMG-20261107-WA0180.jpg"
                       alt="Groom"
                       className="w-full h-full object-cover"
                     />
@@ -1276,7 +1111,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                     <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                       <button
                         onClick={() => window.print()}
-                        className="px-5 py-3 bg-[#292722] text-white text-xs font-semibold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-md min-h-[44px]"
+                        className="px-4 py-2 bg-[#292722] text-white text-[11px] font-semibold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-sm hover:bg-[#8C6D45] transition-colors"
                       >
                         <Download className="w-3.5 h-3.5 text-[#B59A72]" />
                         Download Printable Pass
@@ -1288,14 +1123,14 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                           );
                           window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
                         }}
-                        className="px-5 py-3 bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-md min-h-[44px]"
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-semibold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-sm transition-colors"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
                         Save to WhatsApp
                       </button>
                       <button
                         onClick={() => setGeneratedPass(null)}
-                        className="px-5 py-3 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-xs uppercase tracking-wider rounded-full shadow-xs min-h-[44px] transition-colors"
+                        className="px-4 py-2 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-[11px] uppercase tracking-wider rounded-full shadow-xs transition-colors"
                       >
                         Edit Details
                       </button>
@@ -1430,9 +1265,9 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                     <div className="pt-2">
                       <button
                         type="submit"
-                        className="w-full py-4 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold tracking-[0.16em] uppercase rounded-full transition-all shadow-xl min-h-[48px] flex items-center justify-center gap-2"
+                        className="w-full py-2.5 px-4 bg-[#292722] hover:bg-[#8C6D45] text-white text-[11px] font-semibold tracking-[0.16em] uppercase rounded-full transition-all shadow-md flex items-center justify-center gap-2"
                       >
-                        <Sparkles className="w-4 h-4 text-[#B59A72]" />
+                        <Check className="w-3.5 h-3.5 text-[#B59A72]" />
                         <span>Generate Personalized Pass &amp; Confirm RSVP</span>
                       </button>
                     </div>
@@ -1445,7 +1280,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             <div className="hidden lg:flex lg:col-span-3 flex-col items-center text-center">
               <div className="w-full max-w-[220px] aspect-3/4 rounded-t-full overflow-hidden shadow-2xl bg-neutral-100 group relative">
                 <img
-                  src="/src/assets/images/concierge_groom_portrait_1793535647794.jpg"
+                  src="/src/assets/images/IMG-20261107-WA0180.jpg"
                   alt={`The Groom - ${wedding.partner1}`}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
@@ -1467,412 +1302,8 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
         </div>
       </section>
 
-      {/* 6. DANCE FLOOR SONG REQUEST BOX & TURKISH MARCH ATMOSPHERE */}
-      <section
-        id="microsite-music"
-        className="relative py-24 bg-cover bg-center overflow-hidden"
-        style={{
-          backgroundImage: 'url(/src/assets/images/playlist_celebration_bg_1793535646470.jpg)'
-        }}
-      >
-        {/* Dark Luxury Vignette Scrim */}
-        <div className="absolute inset-0 bg-[#1C1B18]/85 backdrop-blur-xs" />
+      {/* 6. HONEYMOON FUND & GIFT REGISTRY */}
 
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <div className="w-12 h-12 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center mx-auto mb-3 shadow-lg">
-              <Music className="w-6 h-6" />
-            </div>
-            <p className="text-xs font-editorial uppercase tracking-[0.25em] text-[#D4AF37] font-semibold mb-1">
-              The Celebration Playlist
-            </p>
-            <h2 className="font-editorial text-3xl sm:text-4xl text-[#FAF7F0] font-normal">
-              Request a Song for the Dance Floor
-            </h2>
-            <p className="text-xs text-neutral-300 max-w-lg mx-auto mt-2 leading-relaxed">
-              Help {wedding.partner1} &amp; {wedding.partner2} build the ultimate wedding playlist for the DJ at our evening Rooftop celebration in Salt River!
-            </p>
-          </div>
-
-          {/* Classical Atmosphere Audio Control (Mozart Turkish March) */}
-          <div className="bg-[#FAF7F0]/95 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-xl mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleToggleAudio}
-                className="w-12 h-12 rounded-full bg-[#292722] hover:bg-[#8C6D45] text-[#D4AF37] hover:text-white flex items-center justify-center transition-transform hover:scale-105 shrink-0 shadow-md"
-                aria-label={isPlayingAudio ? 'Pause Turkish March' : 'Play Turkish March'}
-              >
-                {isPlayingAudio ? (
-                  <Pause className="w-5 h-5 fill-current" />
-                ) : (
-                  <Play className="w-5 h-5 fill-current translate-x-0.5" />
-                )}
-              </button>
-              <div>
-                <span className="font-editorial text-lg text-[#292722] font-semibold block leading-tight">
-                  Turkish March (Rondo alla Turca)
-                </span>
-                <span className="text-[11px] text-[#8C6D45] font-mono">
-                  Wolfgang Amadeus Mozart · Piano Sonata No. 11, K. 331
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 text-xs">
-              {isPlayingAudio && (
-                <div className="flex items-center gap-1 h-4">
-                  <span className="w-1 h-3 bg-[#8C6D45] animate-pulse rounded-full" />
-                  <span className="w-1 h-4 bg-[#8C6D45] animate-ping rounded-full" />
-                  <span className="w-1 h-2 bg-[#8C6D45] animate-pulse rounded-full" />
-                  <span className="w-1 h-3.5 bg-[#8C6D45] animate-bounce rounded-full" />
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-neutral-600">
-                <button
-                  type="button"
-                  onClick={() => handleVolumeChange(songVolume > 0 ? 0 : 0.65)}
-                  className="text-[#8C6D45] hover:text-[#292722] p-1.5"
-                >
-                  {songVolume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={songVolume}
-                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                  className="w-20 accent-[#8C6D45] cursor-pointer"
-                />
-                <span className="font-mono text-[10px]">{Math.round(songVolume * 100)}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* DANCE FLOOR SONG REQUEST FORM & DJ QUEUE */}
-          <div className="bg-[#FAF7F0]/95 backdrop-blur-md p-6 sm:p-10 rounded-3xl shadow-2xl">
-            {/* Header Lockup */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6">
-              <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#292722] text-[#D4AF37] flex items-center justify-center shrink-0 shadow-lg group cursor-pointer">
-                  <Disc3 className="w-6 h-6 group-hover:rotate-180 transition-transform duration-700 ease-out" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-editorial uppercase tracking-[0.22em] text-[#8C6D45] font-semibold">
-                      Live DJ Concierge · Rooftop Evening
-                    </span>
-                    <span className="text-neutral-300">·</span>
-                    <span className="text-[10px] text-neutral-500 font-mono">Cape Town</span>
-                  </div>
-                  <h3 className="font-editorial text-2xl sm:text-3xl text-[#292722] mt-0.5">
-                    Request a Track for the DJ
-                  </h3>
-                </div>
-              </div>
-
-              {/* Live Queue Counter */}
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-black/5 self-start sm:self-auto shadow-xs">
-                <Headphones className="w-4 h-4 text-[#8C6D45]" />
-                <span className="text-xs font-semibold text-[#292722] font-mono">
-                  {songList.length} {songList.length === 1 ? 'Track' : 'Tracks'} Queued
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs sm:text-sm text-neutral-600 mt-2 max-w-2xl leading-relaxed">
-              Help {wedding.partner1} &amp; {wedding.partner2} build an unforgettable dance party. Tell our DJ what song will bring you straight to the dance floor!
-            </p>
-
-            {/* Quick Inspiration Pills */}
-            <div className="mt-5 pt-4">
-              <div className="flex items-center justify-between gap-2 mb-2.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#8C6D45] flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  <span>Popular Dance Anthems (Tap to Quick-Fill)</span>
-                </span>
-                <span className="text-[10px] text-neutral-400 hidden sm:inline">Click to prefill form</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { title: 'September', artist: 'Earth, Wind & Fire', energy: 'party-anthem' as const },
-                  { title: 'I Wanna Dance with Somebody', artist: 'Whitney Houston', energy: 'party-anthem' as const },
-                  { title: 'Signed, Sealed, Delivered', artist: 'Stevie Wonder', energy: 'high-energy' as const },
-                  { title: 'Uptown Funk', artist: 'Mark Ronson ft. Bruno Mars', energy: 'party-anthem' as const },
-                  { title: "Can't Take My Eyes Off You", artist: 'Frankie Valli', energy: 'mid-tempo' as const },
-                  { title: 'Dancing in the Moonlight', artist: 'Toploader', energy: 'high-energy' as const }
-                ].map((item) => (
-                  <button
-                    key={item.title}
-                    type="button"
-                    onClick={() => {
-                      setNewSongTitle(item.title);
-                      setNewSongArtist(item.artist);
-                      setNewSongEnergy(item.energy);
-                    }}
-                    className="px-3.5 py-2 rounded-full text-xs bg-white hover:bg-[#F3EDE2] text-[#292722] shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 group cursor-pointer min-h-[38px]"
-                  >
-                    <Music2 className="w-3 h-3 text-[#8C6D45] group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">{item.title}</span>
-                    <span className="text-[10px] text-neutral-400">· {item.artist}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Structured DJ Request Form */}
-            <form onSubmit={handleAddSong} className="mt-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Field 1: Track Title */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-                    Track / Song Title <span className="text-[#8C6D45]">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={newSongTitle}
-                      onChange={(e) => setNewSongTitle(e.target.value)}
-                      placeholder="e.g. September or Dancing Queen"
-                      className="w-full pl-10 pr-4 py-3 bg-white rounded-xl text-base sm:text-xs text-[#292722] shadow-xs focus:ring-2 focus:ring-[#8C6D45]/40 border-0 outline-none transition-all placeholder:text-neutral-400"
-                    />
-                    <Music className="w-4 h-4 text-[#8C6D45] absolute left-3.5 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Field 2: Artist / Band */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-                    Artist or Band <span className="text-[#8C6D45]">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={newSongArtist}
-                      onChange={(e) => setNewSongArtist(e.target.value)}
-                      placeholder="e.g. Earth, Wind & Fire"
-                      className="w-full pl-10 pr-4 py-3 bg-white rounded-xl text-base sm:text-xs text-[#292722] shadow-xs focus:ring-2 focus:ring-[#8C6D45]/40 border-0 outline-none transition-all placeholder:text-neutral-400"
-                    />
-                    <Radio className="w-4 h-4 text-[#8C6D45] absolute left-3.5 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Field 3: Guest Name */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-                    Your Name (or Nickname)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={newSongGuest}
-                      onChange={(e) => setNewSongGuest(e.target.value)}
-                      placeholder="e.g. Auntie Claire, Dave & Maya"
-                      className="w-full pl-10 pr-4 py-3 bg-white rounded-xl text-base sm:text-xs text-[#292722] shadow-xs focus:ring-2 focus:ring-[#8C6D45]/40 border-0 outline-none transition-all placeholder:text-neutral-400"
-                    />
-                    <Heart className="w-4 h-4 text-[#8C6D45] absolute left-3.5 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Field 4: Dance Energy Segment */}
-                <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-                    Dance Floor Energy
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/5 rounded-xl">
-                    {[
-                      { id: 'party-anthem' as const, label: '🎉 Party Anthem' },
-                      { id: 'high-energy' as const, label: '⚡ High Energy' },
-                      { id: 'mid-tempo' as const, label: '🍸 Cocktail Groove' },
-                      { id: 'chill' as const, label: '💫 Slow Romance' }
-                    ].map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setNewSongEnergy(opt.id)}
-                        className={`py-2 px-2 text-[11px] font-medium rounded-lg transition-all text-center truncate ${
-                          newSongEnergy === opt.id
-                            ? 'bg-white text-[#292722] font-semibold shadow-xs scale-[1.01]'
-                            : 'text-neutral-600 hover:text-[#292722]'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Field 5: Optional Dedication / Note to the DJ */}
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-                  Dedication or DJ Cue Note (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newSongNotes}
-                  onChange={(e) => setNewSongNotes(e.target.value)}
-                  placeholder="e.g. Dedication to the bridal party when dancing kicks off!"
-                  className="w-full px-4 py-3 bg-white rounded-xl text-base sm:text-xs text-[#292722] shadow-xs focus:ring-2 focus:ring-[#8C6D45]/40 border-0 outline-none transition-all placeholder:text-neutral-400"
-                />
-              </div>
-
-              {/* Submit CTA */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full py-4 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-[0.18em] rounded-xl transition-all shadow-xl min-h-[48px] flex items-center justify-center gap-2.5 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                >
-                  <Send className="w-4 h-4 text-[#D4AF37]" />
-                  <span>Send Request to DJ Queue</span>
-                  <Disc3 className="w-4 h-4 text-[#D4AF37]" />
-                </button>
-              </div>
-            </form>
-
-            {/* Toast Feedback */}
-            {songToast && (
-              <div className="mt-4 p-4 bg-emerald-50 text-emerald-900 text-xs rounded-xl flex items-center justify-between gap-3 shadow-md transition-all animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <Check className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-semibold block">{songToast}</span>
-                    <span className="text-[11px] text-emerald-700">Queued for the evening Rooftop celebration in Salt River.</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSongToast(null)}
-                  className="text-emerald-700 hover:text-emerald-950 p-1 font-mono text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {/* Current Request List / DJ Queue */}
-            <div className="mt-10 pt-8 border-t border-black/5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="font-editorial text-xl sm:text-2xl text-[#292722]">
-                    The Celebration Dance Floor Queue
-                  </h4>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    {songList.length === 0
-                      ? 'No tracks requested yet — be the first to set the rhythm!'
-                      : `${songList.length} tracks requested by family & friends`}
-                  </p>
-                </div>
-
-                {songList.length > 0 && (
-                  <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-[#8C6D45] font-mono">
-                    <ListMusic className="w-3.5 h-3.5" />
-                    <span>Live DJ Order</span>
-                  </span>
-                )}
-              </div>
-
-              {songList.length === 0 ? (
-                <div className="py-12 px-4 rounded-2xl bg-white/70 text-center flex flex-col items-center justify-center shadow-xs">
-                  <div className="w-14 h-14 rounded-full bg-[#8C6D45]/10 text-[#8C6D45] flex items-center justify-center mb-3">
-                    <Disc3 className="w-7 h-7" />
-                  </div>
-                  <h5 className="font-editorial text-lg text-[#292722] font-semibold">
-                    The Dance Floor Queue is Open
-                  </h5>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto mt-1 leading-relaxed">
-                    No tracks have been requested yet. Use the form above or tap one of the popular anthems to get the party started!
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {songList.map((song, idx) => {
-                    const isUpvoted = !!upvotedSongIds[song.id];
-                    return (
-                      <div
-                        key={song.id}
-                        className="p-4 bg-white rounded-2xl flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 group relative"
-                      >
-                        <div>
-                          {/* Top row: Track number + Vinyl badge + Vibe */}
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[10px] text-neutral-400 font-semibold">
-                                #{String(idx + 1).padStart(2, '0')}
-                              </span>
-                              <div className="w-6 h-6 rounded-full bg-[#1C1B18] text-[#D4AF37] flex items-center justify-center group-hover:rotate-180 transition-transform duration-500 shadow-xs">
-                                <Disc3 className="w-3.5 h-3.5" />
-                              </div>
-                            </div>
-
-                            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-[#8C6D45]/10 text-[#8C6D45] font-semibold">
-                              {song.danceEnergy === 'party-anthem'
-                                ? '🎉 Party Anthem'
-                                : song.danceEnergy === 'high-energy'
-                                ? '⚡ High Energy'
-                                : song.danceEnergy === 'mid-tempo'
-                                ? '🍸 Cocktail'
-                                : '💫 Slow Dance'}
-                            </span>
-                          </div>
-
-                          {/* Track and Artist */}
-                          <div className="mt-1">
-                            <h5 className="font-editorial text-base sm:text-lg text-[#292722] font-semibold leading-snug line-clamp-1 group-hover:text-[#8C6D45] transition-colors">
-                              {song.songTitle}
-                            </h5>
-                            <p className="text-xs text-[#8C6D45] font-medium tracking-wide mt-0.5 line-clamp-1">
-                              {song.artist}
-                            </p>
-                          </div>
-
-                          {/* Notes if provided */}
-                          {song.notes && (
-                            <p className="text-[11px] text-neutral-600 italic bg-[#FAF7F0] p-2 rounded-lg mt-2.5 line-clamp-2">
-                              &ldquo;{song.notes}&rdquo;
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Footer row: Requester + Interactive Upvote */}
-                        <div className="mt-3.5 pt-2.5 flex items-center justify-between gap-2">
-                          <span className="text-[10px] text-neutral-500 italic truncate">
-                            From {song.guestName}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUpvote(song.id)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
-                              isUpvoted
-                                ? 'bg-[#8C6D45] text-white shadow-xs scale-105'
-                                : 'bg-black/5 hover:bg-[#8C6D45]/15 text-[#8C6D45]'
-                            }`}
-                            title="Vote for this track on the dance floor"
-                          >
-                            <Heart className={`w-3 h-3 ${isUpvoted ? 'fill-current text-white' : 'text-[#8C6D45]'}`} />
-                            <span className="font-mono">{song.votes || 1}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. HONEYMOON FUND & GIFT REGISTRY */}
       <section className="py-16 bg-[#EFEAE2]/60 text-center">
         <div className="max-w-2xl mx-auto px-4">
           <Gift className="w-6 h-6 text-[#8C6D45] mx-auto mb-2" />
@@ -1929,7 +1360,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             },
             {
               q: 'What are the required dress codes?',
-              icon: Sparkles,
+              icon: Crown,
               a: 'We have chosen dual dress codes to honor both parts of our day: for the Church Ceremony at Lion Voice Tabernacle, the dress code is Vintage Wear (classic mid-century, retro tailored suits, modest heritage attire). For the Evening Dinning Ceremony, the dress code is Gala Wear (formal evening suits, tuxedos, and floor-length gowns).'
             },
             {

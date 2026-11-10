@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * 🎵 HOW TO CHANGE THE WEDDING SONG IN THIS APPLICATION:
+ * HOW TO CHANGE THE WEDDING SONG IN THIS APPLICATION:
  * ============================================================================
  * 
  * File: /src/utils/weddingAudioSynthesizer.ts
@@ -16,7 +16,8 @@
  *   You can modify `TURKISH_MARCH_SCORE` (notes, tempo, chords) below to play any song.
  * ============================================================================
  */
-export const CUSTOM_WEDDING_AUDIO_URL: string | null = null;
+export const CUSTOM_WEDDING_AUDIO_URL: string = '/assets/aistudio/Number_One_cdd277d1.mp3';
+export const WEDDING_AUDIO_TRACK_TITLE: string = 'Number One';
 
 export interface MelodyNote {
   note: string;
@@ -254,18 +255,42 @@ export class WeddingAudioPlayer {
     }
   }
 
-  public async play() {
+  public async play(): Promise<void> {
     // Check if custom audio URL is provided
     const audioUrl = CUSTOM_WEDDING_AUDIO_URL || this.currentScore.audioDataUrl;
     if (audioUrl) {
       if (!this.htmlAudio) {
         this.htmlAudio = new Audio(audioUrl);
         this.htmlAudio.loop = true;
+        this.htmlAudio.preload = 'auto';
+
+        this.htmlAudio.addEventListener('play', () => {
+          this.isPlaying = true;
+          this.onStateChange?.(true, 0);
+        });
+
+        this.htmlAudio.addEventListener('pause', () => {
+          this.isPlaying = false;
+          this.onStateChange?.(false, 0);
+        });
+
+        this.htmlAudio.addEventListener('timeupdate', () => {
+          if (this.htmlAudio && this.htmlAudio.duration) {
+            const progress = this.htmlAudio.currentTime / this.htmlAudio.duration;
+            this.onStateChange?.(true, progress);
+          }
+        });
       }
       this.htmlAudio.volume = this.volume;
-      this.htmlAudio.play().catch(() => {});
-      this.isPlaying = true;
-      this.onStateChange?.(true, 0.5);
+      try {
+        await this.htmlAudio.play();
+        this.isPlaying = true;
+        this.onStateChange?.(true, 0.5);
+      } catch (err) {
+        this.isPlaying = false;
+        this.onStateChange?.(false, 0);
+        throw err;
+      }
       return;
     }
 
@@ -412,14 +437,17 @@ export class WeddingAudioPlayer {
   }
 
   public toggle() {
-    if (this.isPlaying) {
+    if (this.isCurrentlyPlaying()) {
       this.pause();
     } else {
-      this.play();
+      this.play().catch(() => {});
     }
   }
 
   public isCurrentlyPlaying() {
+    if (this.htmlAudio) {
+      return !this.htmlAudio.paused;
+    }
     return this.isPlaying;
   }
 

@@ -22,7 +22,7 @@ import {
   Disc,
   Star,
   Trash2,
-  Sparkles,
+  Disc3,
   Printer,
   Sliders,
   Radio
@@ -952,10 +952,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                   type="button"
                   onClick={handleCurateAiDjSetflow}
                   disabled={isAiDjLoading}
-                  className="px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-[#8C6D45] bg-white border border-[#B59A72]/40 hover:bg-[#FAF7F0] rounded-xs transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8C6D45] bg-white border border-[#B59A72]/40 hover:bg-[#FAF7F0] rounded-xs transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  <span>{isAiDjLoading ? 'Curating Setflow...' : 'AI DJ Setflow'}</span>
+                  <Disc3 className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>{isAiDjLoading ? 'Curating Setflow...' : 'Curate Setflow'}</span>
                 </button>
 
                 <button
@@ -983,9 +983,9 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
               <div className="p-5 bg-[#1C1B18] text-[#FAF7F0] rounded-sm shadow-xl relative">
                 <div className="flex items-center justify-between mb-3 pb-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                    <Music className="w-4 h-4 text-[#D4AF37]" />
                     <span className="font-editorial text-lg text-white">
-                      Gemini AI DJ Setflow &amp; Transition Strategy
+                      Curated DJ Setflow &amp; Transition Strategy
                     </span>
                   </div>
                   <button

@@ -25,6 +25,14 @@
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
+.font-script, .font-calligraphy {
+  font-family: 'Pinyon Script', 'Alex Brush', cursive, serif;
+}
+
+.font-alex {
+  font-family: 'Alex Brush', 'Pinyon Script', cursive, serif;
+}
+
 .font-playfair {
   font-family: 'Playfair Display', Georgia, serif;
 }

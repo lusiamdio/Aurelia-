@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, ShieldCheck, LogOut, Sparkles, User, Heart } from 'lucide-react';
+import { Lock, ShieldCheck, LogOut, User, Heart } from 'lucide-react';
 
 interface NavbarProps {
   currentView: 'landing' | 'studio' | 'dashboard' | 'microsite';

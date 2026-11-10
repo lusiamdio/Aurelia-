@@ -10,7 +10,7 @@ import {
   WaxSealStyle
 } from '../types/wedding';
 import { QRCodeSVG } from '../utils/qrCode';
-import { Sparkles, Calendar, MapPin, CheckCircle, ShieldCheck, Crown, Heart, Download, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, CheckCircle, ShieldCheck, Crown, Heart, Download, Loader2 } from 'lucide-react';
 import { downloadCeremonyCardPDF, downloadDigitalVenuePassPDF } from '../utils/pdfGenerator';
 
 interface InvitationCardPreviewProps {
@@ -359,14 +359,14 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
         </div>
       </div>
 
-      {/* Real-time Gemini AI Generation Status Indicator */}
+      {/* Real-time PDF Generation Status Indicator */}
       {downloadingType && (
-        <div className="w-full max-w-[620px] mb-3 px-3.5 py-2 bg-[#FAF7F0] border border-[#B59A72]/40 rounded-xs text-xs text-[#292722] flex items-center gap-2.5 animate-pulse shadow-xs">
-          <Sparkles className="w-4 h-4 text-[#8C6D45] animate-spin shrink-0" />
-          <span className="font-editorial text-[13px] text-[#8C6D45] font-semibold">
-            Gemini AI Real-Time PDF Generation:
+        <div className="w-full max-w-[620px] mb-3 px-3.5 py-1.5 bg-[#FAF7F0] border border-[#B59A72]/40 rounded-xs text-xs text-[#292722] flex items-center gap-2.5 animate-pulse shadow-xs">
+          <Loader2 className="w-3.5 h-3.5 text-[#8C6D45] animate-spin shrink-0" />
+          <span className="font-editorial text-xs text-[#8C6D45] font-semibold">
+            Archival PDF Generation:
           </span>
-          <span className="text-neutral-700 font-medium truncate">{downloadStatus}</span>
+          <span className="text-neutral-700 text-xs font-medium truncate">{downloadStatus}</span>
         </div>
       )}
 
@@ -766,18 +766,18 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
         </span>
       </div>
 
-      {/* Real-Time Gemini AI PDF Generation Stepper (Active during download) */}
+      {/* High-Resolution PDF Generation Stepper (Active during download) */}
       {downloadingType && (
-        <div className="mt-4 w-full max-w-xl bg-[#1C1B18] text-[#FAF7F0] p-4 sm:p-5 rounded-xs shadow-2xl transition-all">
-          <div className="flex items-center justify-between pb-3">
+        <div className="mt-4 w-full max-w-xl bg-[#1C1B18] text-[#FAF7F0] p-4 rounded-xs shadow-xl transition-all">
+          <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#D4AF37] animate-spin" />
-              <span className="font-editorial text-sm tracking-wide text-white font-medium">
-                Gemini AI Bespoke PDF Engine
+              <Download className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span className="font-editorial text-xs tracking-wider text-white font-medium uppercase">
+                Archival Print Rendering Engine
               </span>
             </div>
-            <span className="text-[11px] font-mono text-[#D4AF37] px-2.5 py-0.5 rounded-full bg-white/10 shadow-xs">
-              {downloadingType === 'card' ? 'Landscape Ceremony Card' : 'QR Digital Venue Pass'}
+            <span className="text-[10px] font-mono text-[#D4AF37] px-2 py-0.5 rounded-full bg-white/10 shadow-xs">
+              {downloadingType === 'card' ? 'Landscape Ceremony Card' : 'QR Venue Gate Pass'}
             </span>
           </div>
 
@@ -834,23 +834,23 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
       )}
 
       {/* Two Separate PDF Download Buttons */}
-      <div className="mt-5 w-full max-w-xl">
+      <div className="mt-4 w-full max-w-xl">
         <div className="flex items-center justify-between mb-2 px-0.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8C6D45]">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8C6D45]">
             Separate PDF Downloads
           </span>
-          <span className="text-[10px] text-neutral-500 flex items-center gap-1 font-sans">
-            <Sparkles className="w-3 h-3 text-[#B59A72]" /> Real-time Gemini rendering
+          <span className="text-[9px] text-neutral-500 font-sans uppercase tracking-wider">
+            300 DPI Archival Resolution
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {/* Button 1: Ceremony Card (Landscape PDF) */}
           <button
             type="button"
             onClick={handleDownloadCard}
             disabled={downloadingType !== null}
-            className="group relative flex flex-col items-start p-4 text-left bg-[#FAF7F0] hover:bg-[#F3EDE2] rounded-xs shadow-md hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            className="group relative flex flex-col items-start p-3 text-left bg-[#FAF7F0] hover:bg-[#F3EDE2] rounded-xs shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center justify-between w-full mb-1">
               <span className="font-editorial text-sm font-semibold text-[#292722] group-hover:text-[#8C6D45] transition-colors">

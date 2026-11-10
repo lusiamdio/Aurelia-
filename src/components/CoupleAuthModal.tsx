@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WeddingData } from '../types/wedding';
-import { Lock, ShieldCheck, Heart, Sparkles, KeyRound, AlertCircle, X, Check } from 'lucide-react';
+import { Lock, ShieldCheck, Heart, KeyRound, AlertCircle, X, Check } from 'lucide-react';
 
 interface CoupleAuthModalProps {
   wedding: WeddingData;
@@ -155,9 +155,9 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
             <button
               type="button"
               onClick={handleQuickDemoFill}
-              className="w-full py-3 bg-white hover:bg-neutral-100 text-[#8C6D45] text-[11px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs min-h-[44px]"
+              className="w-full py-2 px-3 bg-white hover:bg-neutral-100 text-[#8C6D45] text-[10px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs"
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <KeyRound className="w-3 h-3" />
               <span>Autofill Assigned Credential ({p1First} &amp; {p2First})</span>
             </button>
           </div>

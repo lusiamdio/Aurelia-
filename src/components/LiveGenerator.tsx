@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { WeddingData, GuestInvitation, InvitationStyle, FoilAccent, PaperTone } from '../types/wedding';
 import { InvitationCardPreview } from './InvitationCardPreview';
-import { Sparkles, Download, Mail, Check, MessageSquare, Plus, CheckCircle2 } from 'lucide-react';
+import { Download, Mail, Check, MessageSquare, Plus, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface LiveGeneratorProps {
@@ -155,9 +155,9 @@ export const LiveGenerator: React.FC<LiveGeneratorProps> = ({
           {/* Couple Portrait Vignettes: Woman on the Left, Man on the Right */}
           <div className="mt-8 flex items-center justify-center gap-6 sm:gap-12">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-18 sm:w-16 sm:h-20 rounded-t-full overflow-hidden border-2 border-[#B59A72]/40 shadow-md">
+              <div className="w-14 h-18 sm:w-16 sm:h-20 rounded-t-full overflow-hidden shadow-md">
                 <img
-                  src="/src/assets/images/concierge_bride_portrait_1793535647180.jpg"
+                  src="/src/assets/images/IMG-20261107-WA0179.jpg"
                   alt={`The Bride - ${wedding.partner1}`}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-top"
@@ -180,9 +180,9 @@ export const LiveGenerator: React.FC<LiveGeneratorProps> = ({
                 </span>
                 <span className="font-editorial text-base sm:text-lg text-[#292722]">{wedding.partner2}</span>
               </div>
-              <div className="w-14 h-18 sm:w-16 sm:h-20 rounded-t-full overflow-hidden border-2 border-[#B59A72]/40 shadow-md">
+              <div className="w-14 h-18 sm:w-16 sm:h-20 rounded-t-full overflow-hidden shadow-md">
                 <img
-                  src="/src/assets/images/concierge_groom_portrait_1793535647794.jpg"
+                  src="/src/assets/images/IMG-20261107-WA0180.jpg"
                   alt={`The Groom - ${wedding.partner2}`}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover object-top"
@@ -400,9 +400,9 @@ export const LiveGenerator: React.FC<LiveGeneratorProps> = ({
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold tracking-[0.16em] uppercase rounded-xs transition-colors shadow-md flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-4 bg-[#292722] hover:bg-[#8C6D45] text-white text-[11px] font-semibold tracking-[0.16em] uppercase rounded-xs transition-colors shadow-md flex items-center justify-center gap-2"
                 >
-                  <Sparkles className="w-4 h-4 text-[#B59A72]" />
+                  <Check className="w-3.5 h-3.5 text-[#B59A72]" />
                   <span>Generate &amp; Personalize Invitation</span>
                 </button>
               </div>

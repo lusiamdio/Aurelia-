@@ -5,7 +5,6 @@ import {
   ChevronRight,
   RotateCcw,
   Maximize2,
-  Sparkles,
   Layers,
   LayoutGrid
 } from 'lucide-react';
@@ -226,18 +225,17 @@ export const MotionPhotoCardStack: React.FC<MotionPhotoCardStackProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap px-3.5 py-1.5 rounded-full bg-[#1C1B18]/90 text-[#FAF7F0] text-[11px] font-mono tracking-wider backdrop-blur-md shadow-lg flex items-center gap-1.5 pointer-events-none z-40"
+            className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 rounded-full bg-[#1C1B18]/90 text-[#FAF7F0] text-[10px] font-mono tracking-wider backdrop-blur-md shadow-md flex items-center pointer-events-none z-40"
           >
-            <Sparkles className="w-3 h-3 text-[#D4AF37]" />
             <span>Drag or swipe card left / right</span>
           </motion.div>
         )}
       </div>
 
       {/* Tactile Deck Controls & Progress Indicator */}
-      <div className="flex flex-col items-center gap-4 w-full max-w-md px-4">
+      <div className="flex flex-col items-center gap-3 w-full max-w-md px-4">
         {/* Pagination Dots / Pip Bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {photos.map((_, i) => {
             const active = (currentIndex % total) === i;
             return (
@@ -251,8 +249,8 @@ export const MotionPhotoCardStack: React.FC<MotionPhotoCardStackProps> = ({
                 }}
                 className={`transition-all duration-300 rounded-full ${
                   active
-                    ? 'w-6 h-2 bg-[#8C6D45] shadow-xs'
-                    : 'w-2 h-2 bg-neutral-300 hover:bg-[#B59A72]'
+                    ? 'w-5 h-1.5 bg-[#8C6D45] shadow-xs'
+                    : 'w-1.5 h-1.5 bg-neutral-300 hover:bg-[#B59A72]'
                 }`}
                 aria-label={`Go to photo ${i + 1}`}
               />
@@ -260,50 +258,50 @@ export const MotionPhotoCardStack: React.FC<MotionPhotoCardStackProps> = ({
           })}
         </div>
 
-        {/* Action Button Row */}
-        <div className="flex items-center justify-center gap-3 sm:gap-4 w-full">
+        {/* Action Button Row - Compact Luxury Sizing */}
+        <div className="flex items-center justify-center gap-2.5 sm:gap-3 w-full">
           {/* Undo / Previous */}
           <button
             type="button"
             onClick={handlePrev}
-            className="w-11 h-11 rounded-full bg-[#FAF7F0] hover:bg-[#8C6D45] text-[#8C6D45] hover:text-white shadow-md hover:shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            className="w-8 h-8 rounded-full bg-[#FAF7F0] hover:bg-[#8C6D45] text-[#8C6D45] hover:text-white shadow-xs hover:shadow-md flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
             aria-label="Previous photo"
             title="Previous Photo"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
           {/* Reset / Reshuffle */}
           <button
             type="button"
             onClick={handleReset}
-            className="w-11 h-11 rounded-full bg-[#FAF7F0] hover:bg-[#8C6D45] text-[#292722] hover:text-white shadow-md hover:shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            className="w-8 h-8 rounded-full bg-[#FAF7F0] hover:bg-[#8C6D45] text-[#292722] hover:text-white shadow-xs hover:shadow-md flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
             aria-label="Reset stack"
             title="Reset stack"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
           {/* Fullscreen Zoom / Enlarge */}
           <button
             type="button"
             onClick={() => onPhotoClick?.(currentPhoto.src)}
-            className="w-11 h-11 rounded-full bg-[#292722] hover:bg-[#8C6D45] text-[#D4AF37] hover:text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            className="w-8 h-8 rounded-full bg-[#292722] hover:bg-[#8C6D45] text-[#D4AF37] hover:text-white shadow-md hover:shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
             aria-label="Enlarge photo"
             title="Enlarge photo"
           >
-            <Maximize2 className="w-4 h-4" />
+            <Maximize2 className="w-3.5 h-3.5" />
           </button>
 
           {/* Swipe / Next */}
           <button
             type="button"
             onClick={handleNext}
-            className="w-11 h-11 rounded-full bg-[#FAF7F0] hover:bg-[#8C6D45] text-[#8C6D45] hover:text-white shadow-md hover:shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+            className="w-8 h-8 rounded-full bg-[#FAF7F0] hover:bg-[#8C6D45] text-[#8C6D45] hover:text-white shadow-xs hover:shadow-md flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
             aria-label="Next photo"
             title="Next Photo"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 

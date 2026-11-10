@@ -25,7 +25,7 @@ export const INITIAL_WEDDING: WeddingData = {
   dressCodeDining: 'Gala Wear',
   scripture1: 'Therefore what God has joined together, let no one separate. — Mark 10:9',
   scripture2: 'I will restore to you the years that the swarming locust has eaten. — Joel 2:25',
-  heroImage: '/src/assets/images/hero_wedding_editorial_1793528713583.jpg',
+  heroImage: '/src/assets/images/IMG-20261107-WA0121.jpg',
   invitationStyle: 'classic',
   foilAccent: 'gold',
   paperTone: 'ivory',
@@ -37,7 +37,7 @@ export const INITIAL_WEDDING: WeddingData = {
   // Visual Customization & Design options
   cardOrientation: 'portrait',
   selectedFontFamily: 'cormorant',
-  couplePhotoUrl: '/src/assets/images/hero_golden_hour_1793530329379.jpg',
+  couplePhotoUrl: '/src/assets/images/IMG-20261107-WA0131.jpg',
   showPhotoOnCard: true,
   photoFrameStyle: 'arch',
   decorativeGraphic: 'botanical',
@@ -57,28 +57,28 @@ export const INITIAL_WEDDING: WeddingData = {
       title: 'A Meeting & A Glance',
       location: 'Unexpected Beginnings',
       description: 'Everything began unexpectedly… A meeting, a glance, a simple exchange, and since then, everything has changed.',
-      image: '/src/assets/images/hero_garden_romance_1793530329497.jpg'
+      image: '/src/assets/images/IMG-20261107-WA0121.jpg'
     },
     {
       year: 'Chapter 02',
       title: 'Laughter, Dreams & Moments',
       location: 'Growing Together',
       description: 'We have shared laughter, dreams, challenges, and so many other precious moments along the way.',
-      image: '/src/assets/images/hero_golden_hour_1793530329379.jpg'
+      image: '/src/assets/images/IMG-20261107-WA0131.jpg'
     },
     {
       year: 'Chapter 03',
       title: 'Our Most Beautiful Chapter',
       location: 'Cape Town, Western Cape',
       description: 'Today, we are writing the most beautiful chapter of our lives, and we would love to share it with you.',
-      image: '/src/assets/images/hero_timeless_elegance_1793530427405.jpg'
+      image: '/src/assets/images/IMG-20261107-WA0132.jpg'
     },
     {
       year: 'Mark 10:9',
       title: 'United in Holy Matrimony',
       location: 'Lion Voice Tabernacle',
       description: 'Therefore what God has joined together, let no one separate. With all our love and our most sincere gratitude.',
-      image: '/src/assets/images/hero_wedding_editorial_1793528713583.jpg'
+      image: '/src/assets/images/IMG-20261107-WA0136.jpg'
     }
   ],
   songRequests: [],
@@ -112,7 +112,7 @@ export const INVITATION_STYLES: InvitationStyleMeta[] = [
     name: 'Timeless Classic',
     tagline: 'Hand-deckled cotton paper with raised gold foil calligraphy',
     description: 'Heritage typography inspired by European royal wedding correspondence. Featuring hand-torn deckled edges, pure warm cotton fibers, and genuine hot-stamped gold foil leaf.',
-    image: '/src/assets/images/invitation_timeless_classic_1793528712685.jpg',
+    image: '/src/assets/images/IMG-20261107-WA0121.jpg',
     accentColor: '#B59A72',
     borderStyle: 'border border-[#B59A72]/30',
     fontCategory: 'Traditional Serif & Calligraphy',
@@ -124,7 +124,7 @@ export const INVITATION_STYLES: InvitationStyleMeta[] = [
     name: 'Modern Minimalist',
     tagline: 'Architectural precision and sculptural blind debossing',
     description: 'For the contemporary couple who prizes serene negative space, sculptural blind debossing arches, and balanced proportional grid systems on heavy travertine cardstock.',
-    image: '/src/assets/images/invitation_modern_minimalist_1793528714623.jpg',
+    image: '/src/assets/images/IMG-20261107-WA0131.jpg',
     accentColor: '#6B6861',
     borderStyle: 'border border-neutral-300',
     fontCategory: 'Architectural Serif & Sans',
@@ -136,7 +136,7 @@ export const INVITATION_STYLES: InvitationStyleMeta[] = [
     name: 'Royal Elegance',
     tagline: 'Deep midnight charcoal with ornate heraldic crest & velvet band',
     description: 'Bespoke aristocratic grandeur. Heavy 600gsm midnight charcoal board paired with heraldic family cresting, ornate corner filigree, and hand-poured bronze wax seal.',
-    image: '/src/assets/images/invitation_royal_elegance_1793528714567.jpg',
+    image: '/src/assets/images/IMG-20261107-WA0132.jpg',
     accentColor: '#D4AF37',
     borderStyle: 'border border-[#D4AF37]/50',
     fontCategory: 'Regal Heraldic & Roman Capitals',
@@ -148,7 +148,7 @@ export const INVITATION_STYLES: InvitationStyleMeta[] = [
     name: 'Botanical Romance',
     tagline: 'Hand-painted olive foliage, floral vellum wrap & fine linen',
     description: 'Fine art watercolor botanicals interwoven with luminous rose gold foil accents, translucent botanical vellum outer jackets, and soft champagne organic linen weave.',
-    image: '/src/assets/images/invitation_botanical_romance_1793528714370.jpg',
+    image: '/src/assets/images/IMG-20261107-WA0136.jpg',
     accentColor: '#7A8B78',
     borderStyle: 'border border-[#7A8B78]/30',
     fontCategory: 'Delicate Italic Script & Serif',
@@ -160,7 +160,7 @@ export const INVITATION_STYLES: InvitationStyleMeta[] = [
     name: 'Contemporary Luxury',
     tagline: 'Frosted acrylic vellum with engraved champagne metallic typography',
     description: 'High-fashion editorial elegance featuring optical frosted acrylic, art-deco geometric hairline borders, custom brass wax stamps, and textured linen envelopes.',
-    image: '/src/assets/images/invitation_contemporary_luxury_1793528729720.jpg',
+    image: '/src/assets/images/IMG-20261107-WA0155.jpg',
     accentColor: '#C5A880',
     borderStyle: 'border border-[#C5A880]/40',
     fontCategory: 'Geometric High-Fashion Serif',
