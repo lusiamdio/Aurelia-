@@ -128,7 +128,7 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 px-2">
         {/* Left: Dynamic Spread Status & Instruction */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EAE4D9]/90 border border-[#D4AF37]/30 text-[#8C6D45] text-xs font-mono shadow-xs">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EAE4D9]/90 text-[#8C6D45] text-xs font-mono shadow-xs">
             <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />
             <span>
               {effectiveSpread < 0.15
@@ -179,7 +179,7 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
           </button>
 
           {/* Interactive Spread Slider */}
-          <div className="hidden md:flex items-center gap-2 pl-2 border-l border-[#8C6D45]/20">
+          <div className="hidden md:flex items-center gap-2 pl-2">
             <Sliders className="w-3.5 h-3.5 text-[#8C6D45]" />
             <input
               type="range"
@@ -267,47 +267,41 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
                 }}
                 className="absolute cursor-pointer select-none touch-manipulation group"
               >
-                {/* Physical Photo Card */}
+                {/* Physical Photo Card - Completely Borderless, Clean, Edge-to-Edge */}
                 <div
-                  className={`relative rounded-2xl overflow-hidden bg-[#FAF7F0] p-1.5 sm:p-2 transition-all duration-300 ${
+                  className={`relative rounded-2xl overflow-hidden bg-[#1C1B18] transition-all duration-300 ${
                     isHovered
-                      ? 'shadow-[0_28px_60px_-12px_rgba(41,39,34,0.45)] ring-2 ring-[#D4AF37]'
-                      : 'shadow-[0_12px_32px_-8px_rgba(41,39,34,0.25)]'
+                      ? 'shadow-[0_30px_70px_-15px_rgba(0,0,0,0.55)]'
+                      : 'shadow-[0_16px_38px_-10px_rgba(0,0,0,0.32)]'
                   } w-[150px] h-[210px] sm:w-[190px] sm:h-[265px] md:w-[220px] md:h-[305px] lg:w-[240px] lg:h-[335px]`}
                 >
-                  {/* Photo Container */}
-                  <div className="relative w-full h-full rounded-xl overflow-hidden bg-[#1C1B18]">
-                    <img
-                      src={photo.src}
-                      alt={`Samson & Kevine — Gallery Portrait ${i + 1}`}
-                      className="w-full h-full object-cover object-center pointer-events-none transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
+                  <img
+                    src={photo.src}
+                    alt={`Samson & Kevine — Gallery Portrait ${i + 1}`}
+                    className="w-full h-full object-cover object-center pointer-events-none select-none transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
 
-                    {/* Subtle Luxury Film Grain & Vignette */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/10 pointer-events-none" />
+                  {/* Subtle Luxury Film Grain & Vignette for depth (strictly no borders) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/10 pointer-events-none" />
 
-                    {/* Hover Expand Icon Indicator */}
-                    <div
-                      className={`absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#1C1B18]/75 backdrop-blur-md text-[#D4AF37] flex items-center justify-center transition-all duration-300 ${
-                        isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
-                      }`}
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                    </div>
-
-                    {/* Card Index Pill (Subtle on hover) */}
-                    <div
-                      className={`absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-[#1C1B18]/75 backdrop-blur-md text-[#FAF7F0] text-[9px] font-mono tracking-widest uppercase transition-opacity duration-300 ${
-                        isHovered ? 'opacity-100' : 'opacity-0'
-                      }`}
-                    >
-                      {String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-                    </div>
+                  {/* Hover Expand Icon Indicator */}
+                  <div
+                    className={`absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#1C1B18]/75 backdrop-blur-md text-[#D4AF37] flex items-center justify-center transition-all duration-300 ${
+                      isHovered ? 'opacity-100 scale-100 shadow-md' : 'opacity-0 scale-75'
+                    }`}
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
                   </div>
 
-                  {/* Gold Foil Border Shimmer */}
-                  <div className="absolute inset-0 rounded-2xl border border-[#D4AF37]/30 pointer-events-none" />
+                  {/* Card Index Pill (Subtle on hover) */}
+                  <div
+                    className={`absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-[#1C1B18]/75 backdrop-blur-md text-[#FAF7F0] text-[9px] font-mono tracking-widest uppercase transition-opacity duration-300 ${
+                      isHovered ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  >
+                    {String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+                  </div>
                 </div>
               </motion.div>
             );
@@ -330,7 +324,7 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
         </motion.div>
       )}
 
-      {/* Bottom Photo Thumbnails Strip for Quick Direct Selection */}
+      {/* Bottom Photo Thumbnails Strip for Quick Direct Selection - Borderless */}
       <div className="mt-8 pt-4 flex flex-col items-center">
         <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#8C6D45] mb-2.5">
           Quick Jump · {total} Editorial Portraits
@@ -347,10 +341,10 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
                   setHoveredIndex(idx);
                   if (effectiveSpread < 0.3) setManualSpread(0.85);
                 }}
-                className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-300 ${
+                className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-300 shadow-sm ${
                   isCurrent
-                    ? 'w-10 h-14 ring-2 ring-[#D4AF37] scale-110 shadow-md'
-                    : 'w-7 h-10 opacity-60 hover:opacity-100'
+                    ? 'w-10 h-14 scale-110 shadow-lg brightness-105'
+                    : 'w-7 h-10 opacity-55 hover:opacity-100'
                 }`}
                 aria-label={`Jump to portrait ${idx + 1}`}
               >
