@@ -65,6 +65,13 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
     timersRef.current = [];
   };
 
+  // Ensure timers are purged on unmount
+  useEffect(() => {
+    return () => {
+      clearAllTimers();
+    };
+  }, []);
+
   const addTimer = (ms: number, fn: () => void) => {
     const t = setTimeout(fn, ms);
     timersRef.current.push(t);
@@ -247,6 +254,7 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
 
   // Smooth fade-out transition to wedding website
   const handleEnterCelebration = useCallback(() => {
+    clearAllTimers();
     triggerAudioStart();
     setPhase('completing');
     const scene = sceneRef.current;

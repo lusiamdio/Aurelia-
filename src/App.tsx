@@ -13,7 +13,7 @@ import { EmailPreviewModal } from './components/EmailPreviewModal';
 import { CoupleAuthModal } from './components/CoupleAuthModal';
 import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
-import { Check, ShieldAlert } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 export default function App() {
   // Persistent Wedding Data

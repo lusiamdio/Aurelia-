@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MotionPhotoCardStack } from './MotionPhotoCardStack';
+import { ScrollSpreadCardGallery } from './ScrollSpreadCardGallery';
 import { OpeningInvitationExperience } from './OpeningInvitationExperience';
 
 interface WeddingMicrositeProps {
@@ -219,8 +220,8 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   // High-Resolution Lightbox View State
   const [selectedLightboxPhoto, setSelectedLightboxPhoto] = useState<string | null>(null);
 
-  // Photos Section View Mode (Motion swipeable card stack vs grid)
-  const [galleryViewMode, setGalleryViewMode] = useState<'stack' | 'grid'>('stack');
+  // Photos Section View Mode (Scroll-driven card spread vs swipeable stack vs grid)
+  const [galleryViewMode, setGalleryViewMode] = useState<'spread' | 'stack' | 'grid'>('spread');
 
   // Mobile Navigation Drawer State
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -707,7 +708,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
       </section>
 
       {/* 1.5 WELCOME MESSAGE (THE ART OF FOREVER) */}
-      <section id="microsite-welcome" className="py-20 lg:py-24 bg-[#FAF7F0] text-center">
+      <section id="microsite-welcome" className="py-20 lg:py-24 bg-[#FAF7F0] text-center scroll-mt-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="w-11 h-11 rounded-full bg-[#8C6D45]/15 flex items-center justify-center mx-auto mb-4 text-[#8C6D45]">
             <Heart className="w-5 h-5 fill-[#8C6D45]/20 text-[#8C6D45]" />
@@ -738,7 +739,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
       </section>
 
       {/* 2. LOVE STORY CHAPTERS & INTERACTIVE TIMELINE */}
-      <section id="microsite-story" className="py-20 lg:py-28 max-w-5xl mx-auto px-4 sm:px-6">
+      <section id="microsite-story" className="py-20 lg:py-28 max-w-5xl mx-auto px-4 sm:px-6 scroll-mt-16">
         <div className="text-center max-w-3xl mx-auto mb-14">
           <p className="text-xs font-editorial uppercase tracking-[0.25em] text-[#8C6D45] font-semibold mb-2">
             The Journey to Forever
@@ -778,9 +779,9 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           </div>
         </div>
 
-        {/* PHOTOS SECTION: SWIPEABLE CARD STACK IN MOTION */}
+        {/* PHOTOS SECTION: SCROLL-DRIVEN CARD SPREAD IN MOTION */}
         <div id="microsite-photos" className="pt-8 scroll-mt-24">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 pb-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-2">
             <div className="text-center sm:text-left">
               <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-[#8C6D45] font-semibold block">
                 Editorial Collection
@@ -790,38 +791,55 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
               </h3>
             </div>
 
-            {/* Interactive View Mode Selector: Swipeable Stack (Motion) vs Editorial Grid */}
+            {/* Interactive View Mode Selector: Scroll Card Spread vs Swipe Deck vs Grid */}
             <div className="flex items-center gap-1 p-1 bg-[#EAE4D9]/80 rounded-full text-xs shadow-md">
               <button
                 type="button"
+                onClick={() => setGalleryViewMode('spread')}
+                className={`px-3 py-1.5 rounded-full transition-all duration-200 text-xs font-medium flex items-center gap-1.5 ${
+                  galleryViewMode === 'spread'
+                    ? 'bg-[#292722] text-[#D4AF37] shadow-sm'
+                    : 'text-[#5A554E] hover:text-[#292722]'
+                }`}
+                title="Cards spread apart dynamically as you scroll up and down"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Card Spread</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setGalleryViewMode('stack')}
-                className={`p-2.5 rounded-full transition-all duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                className={`px-3 py-1.5 rounded-full transition-all duration-200 text-xs font-medium flex items-center gap-1.5 ${
                   galleryViewMode === 'stack'
                     ? 'bg-[#292722] text-[#D4AF37] shadow-sm'
                     : 'text-[#5A554E] hover:text-[#292722]'
                 }`}
-                aria-label="Swipeable Card Stack View"
-                title="Card Stack View"
+                title="Swipeable single card stack"
               >
-                <Layers className="w-4 h-4" />
+                <span>Swipe Deck</span>
               </button>
               <button
                 type="button"
                 onClick={() => setGalleryViewMode('grid')}
-                className={`p-2.5 rounded-full transition-all duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                className={`px-3 py-1.5 rounded-full transition-all duration-200 text-xs font-medium flex items-center gap-1.5 ${
                   galleryViewMode === 'grid'
                     ? 'bg-[#292722] text-[#D4AF37] shadow-sm'
                     : 'text-[#5A554E] hover:text-[#292722]'
                 }`}
-                aria-label="Grid View"
-                title="Grid View"
+                title="Editorial 3-column mosaic grid"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grid</span>
               </button>
             </div>
           </div>
 
-          {galleryViewMode === 'stack' ? (
+          {galleryViewMode === 'spread' ? (
+            <ScrollSpreadCardGallery
+              photos={JOURNEY_GALLERY_PHOTOS}
+              onPhotoClick={(src) => setSelectedLightboxPhoto(src)}
+            />
+          ) : galleryViewMode === 'stack' ? (
             <div className="py-2">
               <MotionPhotoCardStack
                 photos={JOURNEY_GALLERY_PHOTOS}
@@ -829,7 +847,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 pt-4">
               {JOURNEY_GALLERY_PHOTOS.map((photo, idx) => (
                 <ScrollPopPhoto
                   key={photo.id}
@@ -929,7 +947,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
       </section>
 
       {/* 4. MULTI-EVENT SCHEDULE & ITINERARY */}
-      <section id="microsite-itinerary" className="py-20 lg:py-28 max-w-5xl mx-auto px-4 sm:px-6">
+      <section id="microsite-itinerary" className="py-20 lg:py-28 max-w-5xl mx-auto px-4 sm:px-6 scroll-mt-16">
         <div className="text-center mb-12">
           {/* Top Scripture */}
           <div className="inline-block px-5 py-2.5 rounded-full bg-[#8C6D45]/10 mb-3 shadow-sm">
@@ -1014,7 +1032,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
       </section>
 
       {/* 5. GUEST INVITATION PASS & RSVP SECTION */}
-      <section id="microsite-rsvp-section" className="py-20 bg-[#FAF7F0]">
+      <section id="microsite-rsvp-section" className="py-20 bg-[#FAF7F0] scroll-mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <p className="text-xs font-editorial uppercase tracking-[0.25em] text-[#8C6D45] font-semibold mb-2">
