@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, useScroll, useSpring } from 'motion/react';
-import {
-  Maximize2,
-  Sliders,
-  RotateCcw,
-  Layers,
-  ChevronDown
-} from 'lucide-react';
 
 export interface GalleryPhoto {
   id: string;
@@ -27,10 +20,9 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeCardIndex, setActiveCardIndex] = useState<number>(Math.floor(photos.length / 2));
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
-  const [manualSpread, setManualSpread] = useState<number | null>(null); // null means scroll-driven
-  const [hasScrolled, setHasScrolled] = useState(false);
+  const [scrollProgressVal, setScrollProgressVal] = useState<number>(0);
 
-  // Resize listener for responsive spread calculations
+  // Responsive window resize listener
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
@@ -40,71 +32,70 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
   // Motion useScroll attached to this gallery section
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ['start 0.85', 'center 0.45']
+    offset: ['start 0.95', 'center 0.50']
   });
 
-  // Smooth spring for cinematic inertia
+  // Fast, responsive spring with low mass and high stiffness so cards react instantaneously
   const smoothProgress = useSpring(scrollYProgress, {
-    stiffness: 90,
-    damping: 24,
+    stiffness: 380,
+    damping: 30,
+    mass: 0.15,
     restDelta: 0.001
   });
-
-  // Track raw scroll state as fallback/reactivity
-  const [scrollProgressVal, setScrollProgressVal] = useState<number>(0);
 
   useEffect(() => {
     const unsubscribe = smoothProgress.on('change', (v) => {
       setScrollProgressVal(v);
-      if (v > 0.05) setHasScrolled(true);
     });
     return () => unsubscribe();
   }, [smoothProgress]);
 
-  // Window scroll fallback calculation for bulletproof accuracy
+  // High-frequency scroll listener ensuring instant, continuous, uninterrupted spreading
   useEffect(() => {
-    const handleWindowScroll = () => {
+    let rafId: number;
+
+    const updateScroll = () => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const windowH = window.innerHeight;
 
-      // Section progress: 0 when top is near bottom of viewport, 1 when center reaches middle
-      const startTrigger = windowH * 0.85;
-      const endTrigger = windowH * 0.45;
+      // Fast activation range: starts spreading immediately upon entering (0.95)
+      // and completes a full wide fan spread quickly (0.50) without stalling
+      const startTrigger = windowH * 0.95;
+      const fullSpreadTrigger = windowH * 0.50;
       const currentPos = rect.top;
 
-      let ratio = (startTrigger - currentPos) / (startTrigger - endTrigger);
+      let ratio = (startTrigger - currentPos) / (startTrigger - fullSpreadTrigger);
       ratio = Math.max(0, Math.min(1, ratio));
 
-      // If manual spread is not locked, sync with window scroll
-      if (manualSpread === null) {
-        setScrollProgressVal((prev) => {
-          // Keep highest fidelity between motion useScroll and window listener
-          return Math.abs(ratio - prev) > 0.02 ? ratio : prev;
-        });
-        if (ratio > 0.05) setHasScrolled(true);
-      }
+      setScrollProgressVal(ratio);
     };
 
-    window.addEventListener('scroll', handleWindowScroll, { passive: true });
-    handleWindowScroll();
-    return () => window.removeEventListener('scroll', handleWindowScroll);
-  }, [manualSpread]);
+    const onScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updateScroll);
+    };
 
-  // Effective spread factor between 0 (tight stack) and 1 (fully spread apart like cards)
-  const effectiveSpread = manualSpread !== null ? manualSpread : scrollProgressVal;
+    window.addEventListener('scroll', onScroll, { passive: true });
+    updateScroll();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   const total = photos.length;
   const midIndex = (total - 1) / 2;
 
-  // Responsive spread metrics based on current viewport
+  // Responsive spread geometry based on viewport width
   const isMobile = windowWidth < 640;
   const isTablet = windowWidth >= 640 && windowWidth < 1024;
 
   const maxSpreadX = useMemo(() => {
-    if (isMobile) return Math.min(windowWidth * 0.42, 170);
-    if (isTablet) return Math.min(windowWidth * 0.44, 340);
-    return Math.min(windowWidth * 0.46, 520);
+    if (isMobile) return Math.min(windowWidth * 0.42, 175);
+    if (isTablet) return Math.min(windowWidth * 0.44, 350);
+    return Math.min(windowWidth * 0.46, 530);
   }, [windowWidth, isMobile, isTablet]);
 
   const maxRotateDeg = useMemo(() => {
@@ -114,93 +105,24 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
   }, [isMobile, isTablet]);
 
   const maxArcY = useMemo(() => {
-    if (isMobile) return 28;
-    if (isTablet) return 40;
-    return 55;
+    if (isMobile) return 26;
+    if (isTablet) return 38;
+    return 50;
   }, [isMobile, isTablet]);
+
+  const effectiveSpread = scrollProgressVal;
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full py-8 select-none"
+      className="relative w-full py-4 select-none"
     >
-      {/* Top Gallery Toolbar: Real-time Spread Indicator & Tactile Controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 px-2">
-        {/* Left: Dynamic Spread Status & Instruction */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#EAE4D9]/90 text-[#8C6D45] text-xs font-mono shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />
-            <span>
-              {effectiveSpread < 0.15
-                ? 'Deck Stacked · Scroll to Spread'
-                : effectiveSpread > 0.85
-                ? 'Cards Spread Wide · Click to Expand'
-                : `Spreading Cards (${Math.round(effectiveSpread * 100)}%)`}
-            </span>
-          </div>
-
-          {manualSpread !== null && (
-            <button
-              type="button"
-              onClick={() => setManualSpread(null)}
-              className="text-[11px] font-mono text-[#8C6D45] hover:text-[#292722] underline underline-offset-2 flex items-center gap-1"
-              title="Resume following page scroll up and down"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Sync to Scroll</span>
-            </button>
-          )}
-        </div>
-
-        {/* Right: Quick Action Presets (Spread Out / Stack Together / Slider) */}
-        <div className="flex items-center gap-2">
-          {/* Preset Buttons */}
-          <button
-            type="button"
-            onClick={() => setManualSpread(1)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
-              effectiveSpread >= 0.95 && manualSpread !== null
-                ? 'bg-[#292722] text-[#D4AF37] shadow-sm'
-                : 'bg-white/70 hover:bg-white text-[#5A554E] hover:text-[#292722] shadow-xs'
-            }`}
-          >
-            Spread Cards
-          </button>
-          <button
-            type="button"
-            onClick={() => setManualSpread(0)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-all ${
-              effectiveSpread <= 0.05 && manualSpread !== null
-                ? 'bg-[#292722] text-[#D4AF37] shadow-sm'
-                : 'bg-white/70 hover:bg-white text-[#5A554E] hover:text-[#292722] shadow-xs'
-            }`}
-          >
-            Stack Deck
-          </button>
-
-          {/* Interactive Spread Slider */}
-          <div className="hidden md:flex items-center gap-2 pl-2">
-            <Sliders className="w-3.5 h-3.5 text-[#8C6D45]" />
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={effectiveSpread}
-              onChange={(e) => setManualSpread(parseFloat(e.target.value))}
-              aria-label="Manual Card Spread Slider"
-              className="w-24 accent-[#8C6D45] cursor-pointer"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* STAGE: The Card Spread Arena */}
-      <div className="relative w-full h-[480px] sm:h-[560px] md:h-[620px] lg:h-[680px] flex items-center justify-center overflow-visible">
-        {/* Soft Ambient Gold Floor Glow */}
+      {/* STAGE: Fast, Continuous Card Spread Arena */}
+      <div className="relative w-full h-[460px] sm:h-[540px] md:h-[600px] lg:h-[660px] flex items-center justify-center overflow-visible">
+        {/* Ambient Warm Golden Floor Glow */}
         <div
-          className="absolute inset-0 max-w-4xl mx-auto rounded-full bg-radial from-[#D4AF37]/10 via-[#8C6D45]/5 to-transparent pointer-events-none transition-opacity duration-700"
-          style={{ opacity: 0.3 + effectiveSpread * 0.5 }}
+          className="absolute inset-0 max-w-4xl mx-auto rounded-full bg-radial from-[#D4AF37]/12 via-[#8C6D45]/5 to-transparent pointer-events-none transition-opacity duration-300"
+          style={{ opacity: 0.35 + effectiveSpread * 0.45 }}
         />
 
         {/* Central Cards Spread Layout */}
@@ -210,30 +132,30 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
             const isHovered = hoveredIndex === i;
             const isActive = activeCardIndex === i;
 
-            // Target positions when FULLY SPREAD (effectiveSpread = 1)
+            // Target positions when SPREAD
             const targetX = norm * maxSpreadX;
-            // Arc curve: cards curve slightly downwards towards edges like a real fan of cards
+            // Arc curve: cards curve slightly downwards towards edges like a natural fan
             const targetY = Math.pow(norm, 2) * maxArcY;
             const targetRotate = norm * maxRotateDeg;
 
-            // Target positions when STACKED (effectiveSpread = 0)
-            const stackedX = (i - midIndex) * (isMobile ? 1.5 : 2.5); // subtle stack offset
-            const stackedY = i * (isMobile ? 1.2 : 2.0); // deck height
-            const stackedRotate = (i % 2 === 0 ? 1 : -1) * (i * 0.8 - 2.5); // organic deck jitter
+            // Target positions when STACKED
+            const stackedX = (i - midIndex) * (isMobile ? 1.5 : 2.5);
+            const stackedY = i * (isMobile ? 1.2 : 1.8);
+            const stackedRotate = (i % 2 === 0 ? 1 : -1) * (i * 0.8 - 2.5);
             const stackedScale = 1 - (total - 1 - i) * 0.007;
 
-            // Interpolate based on current effectiveSpread
+            // Fast, continuous interpolation
             const currentX = stackedX + (targetX - stackedX) * effectiveSpread;
             const currentY = stackedY + (targetY - stackedY) * effectiveSpread;
             const currentRotate = stackedRotate + (targetRotate - stackedRotate) * effectiveSpread;
             const baseScale = stackedScale + (1.0 - stackedScale) * effectiveSpread;
 
-            // Final scale and elevation on hover
+            // Hover elevation
             const finalScale = isHovered ? baseScale * 1.08 : baseScale;
             const finalY = isHovered ? currentY - 24 : currentY;
             const finalRotate = isHovered ? 0 : currentRotate;
 
-            // Layering: hovered card is highest; when spread, center cards sit nicely
+            // Layering
             const baseZ = i <= midIndex ? i + 1 : total - i;
             const zIndex = isHovered ? 100 : isActive ? 50 : baseZ + 10;
 
@@ -261,17 +183,17 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
                 }}
                 transition={{
                   type: 'spring',
-                  stiffness: 180,
-                  damping: 24,
-                  mass: 0.8
+                  stiffness: 450,
+                  damping: 30,
+                  mass: 0.15
                 }}
                 className="absolute cursor-pointer select-none touch-manipulation group"
               >
-                {/* Physical Photo Card - Completely Borderless, Clean, Edge-to-Edge */}
+                {/* Physical Photo Card - Completely Pristine, Borderless, No Labels */}
                 <div
-                  className={`relative rounded-2xl overflow-hidden bg-[#1C1B18] transition-all duration-300 ${
+                  className={`relative rounded-2xl overflow-hidden bg-[#1C1B18] transition-shadow duration-300 ${
                     isHovered
-                      ? 'shadow-[0_30px_70px_-15px_rgba(0,0,0,0.55)]'
+                      ? 'shadow-[0_32px_75px_-15px_rgba(0,0,0,0.55)]'
                       : 'shadow-[0_16px_38px_-10px_rgba(0,0,0,0.32)]'
                   } w-[150px] h-[210px] sm:w-[190px] sm:h-[265px] md:w-[220px] md:h-[305px] lg:w-[240px] lg:h-[335px]`}
                 >
@@ -282,26 +204,8 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
                     loading="lazy"
                   />
 
-                  {/* Subtle Luxury Film Grain & Vignette for depth (strictly no borders) */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/10 pointer-events-none" />
-
-                  {/* Hover Expand Icon Indicator */}
-                  <div
-                    className={`absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#1C1B18]/75 backdrop-blur-md text-[#D4AF37] flex items-center justify-center transition-all duration-300 ${
-                      isHovered ? 'opacity-100 scale-100 shadow-md' : 'opacity-0 scale-75'
-                    }`}
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </div>
-
-                  {/* Card Index Pill (Subtle on hover) */}
-                  <div
-                    className={`absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-[#1C1B18]/75 backdrop-blur-md text-[#FAF7F0] text-[9px] font-mono tracking-widest uppercase transition-opacity duration-300 ${
-                      isHovered ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  >
-                    {String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-                  </div>
+                  {/* Soft Vignette Depth (strictly no text, no icons, no borders) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-white/10 pointer-events-none" />
                 </div>
               </motion.div>
             );
@@ -309,26 +213,8 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
         </div>
       </div>
 
-      {/* Floating Scroll Guide (Appears initially when stacked, gently fades as user scrolls) */}
-      {!hasScrolled && effectiveSpread < 0.25 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          className="flex flex-col items-center justify-center gap-1.5 mt-2 pointer-events-none"
-        >
-          <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#1C1B18]/85 text-[#FAF7F0] text-xs font-mono tracking-wider backdrop-blur-md shadow-lg">
-            <ChevronDown className="w-3.5 h-3.5 text-[#D4AF37] animate-bounce" />
-            <span>Scroll down to spread cards apart</span>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Bottom Photo Thumbnails Strip for Quick Direct Selection - Borderless */}
-      <div className="mt-8 pt-4 flex flex-col items-center">
-        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#8C6D45] mb-2.5">
-          Quick Jump · {total} Editorial Portraits
-        </span>
+      {/* Clean, Minimal Thumbnails Strip for Quick Direct Selection (No labels) */}
+      <div className="mt-6 flex flex-col items-center">
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full px-4 py-2 no-scrollbar">
           {photos.map((p, idx) => {
             const isCurrent = activeCardIndex === idx;
@@ -339,14 +225,13 @@ export const ScrollSpreadCardGallery: React.FC<ScrollSpreadCardGalleryProps> = (
                 onClick={() => {
                   setActiveCardIndex(idx);
                   setHoveredIndex(idx);
-                  if (effectiveSpread < 0.3) setManualSpread(0.85);
                 }}
-                className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-300 shadow-sm ${
+                className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-200 shadow-sm ${
                   isCurrent
-                    ? 'w-10 h-14 scale-110 shadow-lg brightness-105'
-                    : 'w-7 h-10 opacity-55 hover:opacity-100'
+                    ? 'w-10 h-14 scale-110 shadow-lg brightness-105 opacity-100'
+                    : 'w-7 h-10 opacity-50 hover:opacity-90'
                 }`}
-                aria-label={`Jump to portrait ${idx + 1}`}
+                aria-label={`Select photo ${idx + 1}`}
               >
                 <img
                   src={p.src}

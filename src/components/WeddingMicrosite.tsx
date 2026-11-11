@@ -783,10 +783,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
         <div id="microsite-photos" className="pt-8 scroll-mt-24">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-2">
             <div className="text-center sm:text-left">
-              <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-[#8C6D45] font-semibold block">
-                Editorial Collection
-              </span>
-              <h3 className="font-editorial text-2xl sm:text-3xl text-[#292722] mt-0.5">
+              <h3 className="font-editorial text-2xl sm:text-3xl text-[#292722]">
                 Moments in Motion
               </h3>
             </div>
