@@ -174,17 +174,20 @@ export async function downloadCeremonyCardPDF({
   onStatusUpdate?.('Initializing vector canvas');
   await sleep(400);
 
-  onStatusUpdate?.('Rendering bespoke calligraphy');
-  const geminiData = await fetchGeminiPdfContent('card', {
-    guestName,
-    guestId,
-    hasPlusOne,
-    plusOneName,
-    coupleNames: `${wedding.partner1} & ${wedding.partner2}`,
-    venue: wedding.venue,
-    date: wedding.rawDate,
-    dressCode: wedding.dressCodeSummary
-  });
+  onStatusUpdate?.('Rendering bespoke calligraphy & photo');
+  const [geminiData, photoDataUrl] = await Promise.all([
+    fetchGeminiPdfContent('card', {
+      guestName,
+      guestId,
+      hasPlusOne,
+      plusOneName,
+      coupleNames: `${wedding.partner1} & ${wedding.partner2}`,
+      venue: wedding.venue,
+      date: wedding.rawDate,
+      dressCode: wedding.dressCodeSummary
+    }),
+    loadImageDataUrl(wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg')
+  ]);
   await sleep(350);
 
   onStatusUpdate?.('Generating high-density QR gate pass');
@@ -270,28 +273,72 @@ export async function downloadCeremonyCardPDF({
   doc.setFontSize(8);
   doc.text('request the pleasure of your company at their sacred marriage celebration', width / 2, 45, { align: 'center' });
 
-  // Honoured Guest Badge & Gemini Personalized Blessing
-  const guestBoxY = 49;
-  const guestBoxHeight = 27;
-  doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
-  doc.setDrawColor(181, 154, 114);
-  doc.setLineWidth(0.3);
-  doc.rect(24, guestBoxY, width - 48, guestBoxHeight, 'FD');
+  // Honoured Guest Badge & Gemini Personalized Blessing with Couple Photo
+  const photoW = 26;
+  const photoH = 32;
+  const guestBoxY = photoDataUrl ? 46 : 49;
+  const guestBoxHeight = photoDataUrl ? photoH : 27;
 
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(8);
-  const guestLine = hasPlusOne && plusOneName
-    ? `HONOURED GUEST: ${guestName.toUpperCase()}  &  ${plusOneName.toUpperCase()} (+1)`
-    : `HONOURED GUEST: ${guestName.toUpperCase()}`;
-  doc.text(guestLine, width / 2, guestBoxY + 5.5, { align: 'center' });
+  if (photoDataUrl) {
+    const photoX = 18;
+    doc.setFillColor(245, 238, 221);
+    doc.setDrawColor(181, 154, 114);
+    doc.setLineWidth(0.4);
+    doc.rect(photoX - 1, guestBoxY - 1, photoW + 2, photoH + 2, 'FD');
 
-  // Gemini AI Personalized Blessing Dedication
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(8);
-  const splitBlessing = doc.splitTextToSize(`“${geminiData.blessing}”`, width - 58);
-  doc.text(splitBlessing, width / 2, guestBoxY + 11.5, { align: 'center' });
+    try {
+      doc.addImage(photoDataUrl, 'JPEG', photoX, guestBoxY, photoW, photoH);
+    } catch {
+      doc.setFillColor(212, 175, 55);
+      doc.circle(photoX + photoW / 2, guestBoxY + photoH / 2, 10, 'F');
+    }
+
+    // Guest Dedication Box on right side of photo
+    const boxX = photoX + photoW + 5;
+    const boxW = width - boxX - 18;
+    doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
+    doc.setDrawColor(181, 154, 114);
+    doc.setLineWidth(0.3);
+    doc.rect(boxX, guestBoxY, boxW, photoH, 'FD');
+
+    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(8);
+    const guestLine = hasPlusOne && plusOneName
+      ? `HONOURED GUEST: ${guestName.toUpperCase()}  &  ${plusOneName.toUpperCase()} (+1)`
+      : `HONOURED GUEST: ${guestName.toUpperCase()}`;
+    doc.text(guestLine, boxX + boxW / 2, guestBoxY + 6, { align: 'center' });
+
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.setFont('times', 'italic');
+    doc.setFontSize(8);
+    const splitBlessing = doc.splitTextToSize(`“${geminiData.blessing}”`, boxW - 8);
+    doc.text(splitBlessing, boxX + boxW / 2, guestBoxY + 13, { align: 'center' });
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
+    doc.text(`Official Guest Pass Ref: ${guestId}  ·  Verified Ceremony Credential`, boxX + boxW / 2, guestBoxY + photoH - 4, { align: 'center' });
+  } else {
+    doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
+    doc.setDrawColor(181, 154, 114);
+    doc.setLineWidth(0.3);
+    doc.rect(24, guestBoxY, width - 48, guestBoxHeight, 'FD');
+
+    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(8);
+    const guestLine = hasPlusOne && plusOneName
+      ? `HONOURED GUEST: ${guestName.toUpperCase()}  &  ${plusOneName.toUpperCase()} (+1)`
+      : `HONOURED GUEST: ${guestName.toUpperCase()}`;
+    doc.text(guestLine, width / 2, guestBoxY + 5.5, { align: 'center' });
+
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.setFont('times', 'italic');
+    doc.setFontSize(8);
+    const splitBlessing = doc.splitTextToSize(`“${geminiData.blessing}”`, width - 58);
+    doc.text(splitBlessing, width / 2, guestBoxY + 11.5, { align: 'center' });
+  }
 
   // Wedding Date & Agenda Details
   const detailsY = guestBoxY + guestBoxHeight + 6;

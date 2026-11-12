@@ -289,7 +289,8 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
 
   // Render Couple Photo on Card
   const renderCouplePhoto = () => {
-    if (!wedding.showPhotoOnCard || !wedding.couplePhotoUrl) return null;
+    const photoUrl = wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg';
+    if (wedding.showPhotoOnCard === false && !wedding.couplePhotoUrl) return null;
     const frame = wedding.photoFrameStyle || 'arch';
 
     const frameClasses = () => {
@@ -307,7 +308,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
     return (
       <div className={frameClasses()}>
         <img
-          src={wedding.couplePhotoUrl}
+          src={photoUrl}
           alt={`${wedding.partner1} & ${wedding.partner2}`}
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover object-center"
@@ -437,11 +438,11 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-6 items-center min-h-[380px]">
               {/* Left Column: Photo / Crest */}
               <div className="md:col-span-5 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-[#B59A72]/20 pb-4 md:pb-0 md:pr-4">
-                {wedding.showPhotoOnCard && wedding.couplePhotoUrl ? (
+                {wedding.showPhotoOnCard !== false && (wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg') ? (
                   <div className="w-full max-w-[200px] aspect-4/5 rounded-t-full border border-[#B59A72]/40 overflow-hidden shadow-md">
                     <img
-                      src={wedding.couplePhotoUrl}
-                      alt="Couple"
+                      src={wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg'}
+                      alt={`${wedding.partner1} & ${wedding.partner2}`}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                     />
@@ -660,6 +661,21 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
               <div className="text-[11px] font-mono tracking-widest text-[#8C6D45] uppercase mt-0.5">
                 Pass ID: {guestId}
               </div>
+            </div>
+
+            {/* Couple Photo Badge on Back / Pass */}
+            <div className="flex flex-col items-center my-2">
+              <div className="w-16 h-16 rounded-full border-2 border-[#B59A72] shadow-sm overflow-hidden">
+                <img
+                  src={wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg'}
+                  alt={`${wedding.partner1} & ${wedding.partner2}`}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover object-top"
+                />
+              </div>
+              <span className="font-editorial text-xs font-medium text-[#8C6D45] mt-1 tracking-wider uppercase">
+                {wedding.partner1} &amp; {wedding.partner2}
+              </span>
             </div>
 
             {/* QR Code Container */}

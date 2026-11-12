@@ -62,7 +62,16 @@ export const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({
               {wedding.partner2}
             </h2>
 
-            <p className="text-xs uppercase tracking-widest text-[#8C6D45] font-semibold mt-4 mb-2">
+            {/* Couple Photo */}
+            <div className="w-28 h-36 rounded-t-full border border-[#B59A72]/40 overflow-hidden shadow-md mx-auto my-3">
+              <img
+                src={wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg'}
+                alt={`${wedding.partner1} & ${wedding.partner2}`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <p className="text-xs uppercase tracking-widest text-[#8C6D45] font-semibold mt-2 mb-2">
               Request the Pleasure of Your Company
             </p>
 

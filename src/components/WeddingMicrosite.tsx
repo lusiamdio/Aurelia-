@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { WeddingData, GuestInvitation, SongRequest } from '../types/wedding';
 import { InvitationCardPreview } from './InvitationCardPreview';
 import { WeddingAudioPlayer } from '../utils/weddingAudioSynthesizer';
+import { downloadUnifiedInvitationPDF } from '../utils/pdfGenerator';
 import {
   Calendar,
   MapPin,
@@ -27,7 +28,8 @@ import {
   User,
   Users,
   Lock,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MotionPhotoCardStack } from './MotionPhotoCardStack';
@@ -281,6 +283,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const [dietary, setDietary] = useState('');
   const [attendance, setAttendance] = useState<'attending' | 'declined'>('attending');
   const [generatedPass, setGeneratedPass] = useState<GuestInvitation | null>(null);
+  const [isDownloadingPass, setIsDownloadingPass] = useState(false);
 
   // Active FAQ
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -1203,17 +1206,46 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                         plusOneName={generatedPass.plusOneName}
                         plusOneStatus={generatedPass.plusOneStatus || 'pending'}
                         plusOneDietary={generatedPass.plusOneDietary}
-                        showPassSide={true}
+                        showPassSide={false}
                       />
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                       <button
-                        onClick={() => window.print()}
-                        className="px-4 py-2 bg-[#292722] text-white text-[11px] font-semibold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-sm hover:bg-[#8C6D45] transition-colors"
+                        onClick={async () => {
+                          if (!generatedPass) return;
+                          try {
+                            setIsDownloadingPass(true);
+                            await downloadUnifiedInvitationPDF({
+                              wedding,
+                              guestName: generatedPass.fullName,
+                              guestId: generatedPass.id,
+                              hasPlusOne: generatedPass.hasPlusOne,
+                              plusOneName: generatedPass.plusOneName,
+                              plusOneStatus: generatedPass.plusOneStatus || 'confirmed',
+                              plusOneDietary: generatedPass.plusOneDietary,
+                              selectedEventIds: ['evt-benediction', 'evt-reception']
+                            });
+                          } catch (err) {
+                            console.error('Failed to download unified invitation PDF:', err);
+                          } finally {
+                            setIsDownloadingPass(false);
+                          }
+                        }}
+                        disabled={isDownloadingPass}
+                        className="px-4 py-2 bg-[#292722] text-white text-[11px] font-semibold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-sm hover:bg-[#8C6D45] transition-colors disabled:opacity-50 cursor-pointer"
                       >
-                        <Download className="w-3.5 h-3.5 text-[#B59A72]" />
-                        Download Printable Pass
+                        {isDownloadingPass ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 text-[#B59A72] animate-spin" />
+                            <span>Packaging Invitation...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5 text-[#B59A72]" />
+                            <span>Download Invitation PDF</span>
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={() => {
