@@ -18,8 +18,26 @@ interface CarouselSlide {
 
 const SLIDES: CarouselSlide[] = [
   {
-    id: 'hero-1',
+    id: 'hero-0',
     slideNumber: '01',
+    theme: 'Sacred Covenant',
+    quote: 'Therefore what God has joined together, let no one separate.',
+    image: '/src/assets/images/IMG-20261107-WA0166.jpg',
+    alt: 'Samson & Kevine sacred union portrait',
+    focalPoint: 'object-center'
+  },
+  {
+    id: 'hero-0b',
+    slideNumber: '02',
+    theme: 'Royal Devotion',
+    quote: 'A celebration of grace, faith, and unending romance.',
+    image: '/src/assets/images/IMG-20261111-WA0068.jpg',
+    alt: 'Samson & Kevine royal wedding portrait',
+    focalPoint: 'object-center'
+  },
+  {
+    id: 'hero-1',
+    slideNumber: '03',
     theme: 'Two Hearts, One Story',
     quote: 'Every love story deserves a beautiful beginning.',
     image: '/src/assets/images/IMG-20261107-WA0121.jpg',

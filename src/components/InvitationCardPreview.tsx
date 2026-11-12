@@ -10,8 +10,8 @@ import {
   WaxSealStyle
 } from '../types/wedding';
 import { QRCodeSVG } from '../utils/qrCode';
-import { Calendar, MapPin, CheckCircle, ShieldCheck, Crown, Heart, Download, Loader2 } from 'lucide-react';
-import { downloadCeremonyCardPDF, downloadDigitalVenuePassPDF } from '../utils/pdfGenerator';
+import { Calendar, MapPin, CheckCircle, ShieldCheck, Crown, Heart, Download, Loader2, Sparkles, Layers } from 'lucide-react';
+import { downloadCeremonyCardPDF, downloadDigitalVenuePassPDF, downloadUnifiedInvitationPDF } from '../utils/pdfGenerator';
 
 interface InvitationCardPreviewProps {
   wedding: WeddingData;
@@ -49,12 +49,12 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
   showPassSide: initialShowPassSide = false
 }) => {
   const [activeTab, setActiveTab] = useState<'card' | 'access'>(initialShowPassSide ? 'access' : 'card');
-  const [downloadingType, setDownloadingType] = useState<'card' | 'pass' | null>(null);
+  const [downloadingType, setDownloadingType] = useState<'card' | 'pass' | 'unified' | null>(null);
   const [downloadStatus, setDownloadStatus] = useState<string>('');
 
   const PDF_STEPS = [
     'Initializing vector canvas',
-    'Rendering bespoke calligraphy',
+    'Rendering bespoke calligraphy & photo',
     'Generating high-density QR gate pass',
     'Packaging print-ready typography and finishing touches'
   ];
@@ -64,6 +64,29 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
     PDF_STEPS.findIndex((s) => s.toLowerCase() === (downloadStatus || '').toLowerCase())
   );
   const progressPercent = Math.min(100, Math.round(((currentStepIndex + 1) / PDF_STEPS.length) * 100));
+
+  const handleDownloadUnified = async () => {
+    try {
+      setDownloadingType('unified');
+      setDownloadStatus('Initializing vector canvas');
+      await downloadUnifiedInvitationPDF({
+        wedding,
+        guestName,
+        guestId,
+        hasPlusOne,
+        plusOneName,
+        plusOneStatus,
+        plusOneDietary,
+        selectedEventIds,
+        onStatusUpdate: (msg) => setDownloadStatus(msg)
+      });
+    } catch (err) {
+      console.error('Failed to download Unified Invitation:', err);
+    } finally {
+      setDownloadingType(null);
+      setDownloadStatus('');
+    }
+  };
 
   const handleDownloadCard = async () => {
     try {
@@ -323,39 +346,22 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
           </button>
         </div>
 
-        {/* Quick Download Button matching current active tab */}
+        {/* Unified Front & Back Download Button */}
         <div className="flex items-center gap-2">
-          {activeTab === 'card' ? (
-            <button
-              type="button"
-              onClick={handleDownloadCard}
-              disabled={Boolean(downloadingType)}
-              className="px-3 py-1.5 rounded-xs bg-[#292722] hover:bg-[#8C6D45] text-white text-[11px] font-semibold tracking-wider uppercase transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
-              title="Download Ceremony Card (Landscape PDF) personalized with Gemini AI"
-            >
-              {downloadingType === 'card' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#B59A72]" />
-              ) : (
-                <Download className="w-3.5 h-3.5 text-[#B59A72]" />
-              )}
-              <span>Download Card PDF</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleDownloadPass}
-              disabled={Boolean(downloadingType)}
-              className="px-3 py-1.5 rounded-xs bg-[#292722] hover:bg-[#8C6D45] text-white text-[11px] font-semibold tracking-wider uppercase transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
-              title="Download QR Digital Venue Pass (PDF) with Gemini AI Concierge protocol"
-            >
-              {downloadingType === 'pass' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#B59A72]" />
-              ) : (
-                <Download className="w-3.5 h-3.5 text-[#B59A72]" />
-              )}
-              <span>Download Pass PDF</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleDownloadUnified}
+            disabled={Boolean(downloadingType)}
+            className="px-3.5 py-1.5 rounded-lg bg-[#292722] hover:bg-[#8C6D45] text-white text-[11px] font-semibold tracking-wider uppercase transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+            title="Download Unified Invitation: Front Ceremony Card & Back QR Gate Pass together in one PDF document"
+          >
+            {downloadingType === 'unified' ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#B59A72]" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-[#B59A72]" />
+            )}
+            <span>{downloadingType === 'unified' ? 'Generating Unified PDF...' : 'Download Invitation (Front & Back)'}</span>
+          </button>
         </div>
       </div>
 
@@ -476,15 +482,15 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                     Request the pleasure of the company of
                   </p>
                   <div
-                    className={`py-1.5 px-3 rounded-xs border-y ${
-                      isDark ? 'border-[#D4AF37]/30 bg-white/5' : 'border-[#B59A72]/30 bg-[#B59A72]/5'
+                    className={`py-2 px-4 rounded-xl ${
+                      isDark ? 'bg-white/5' : 'bg-[#B59A72]/10'
                     }`}
                   >
                     <h3 className="font-editorial text-lg sm:text-xl font-semibold">
                       {displayName}
-                      {hasPlusOne && plusOneName && (
-                        <span className="block text-xs font-sans-ui font-normal opacity-85 mt-0.5">
-                          &amp; {plusOneName}
+                      {hasPlusOne && (
+                        <span className="block text-xs font-sans-ui font-normal text-[#8C6D45] mt-0.5">
+                          {plusOneName ? `& ${plusOneName}` : '· Couple Admission (2 Seats)'}
                         </span>
                       )}
                     </h3>
@@ -495,11 +501,11 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                 </div>
 
                 {/* Agenda & Scripture on Landscape Invitation Card */}
-                <div className="pt-2 border-t border-[#B59A72]/20 w-full text-[10px] space-y-1.5">
+                <div className="pt-2 w-full text-[10px] space-y-1.5">
                   <p className="font-editorial italic text-[10.5px] text-[#8C6D45] leading-snug">
-                    &ldquo;Therefore what God has joined together, let no one separate.&rdquo; — Mark 10:9
+                    &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
                   </p>
-                  <div className="grid grid-cols-2 gap-2 text-left bg-black/5 dark:bg-white/5 p-2 rounded-xs border border-[#B59A72]/20">
+                  <div className="grid grid-cols-2 gap-2 text-left bg-black/5 dark:bg-white/5 p-2 rounded-xl">
                     <div>
                       <span className="font-semibold block font-editorial text-[11px] text-[#292722] dark:text-[#FAF7F0]">
                         Wedding Benediction · 13:00
@@ -518,7 +524,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                     </div>
                   </div>
                   <p className="font-editorial italic text-[9.5px] text-neutral-500">
-                    &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo; — Joel 2:25
+                    &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo;
                   </p>
                 </div>
               </div>
@@ -567,17 +573,15 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
 
                 {/* Highlighted Guest Name */}
                 <div
-                  className={`py-1.5 px-4 rounded-xs border-y ${
-                    isDark
-                      ? 'border-[#D4AF37]/30 bg-white/5'
-                      : 'border-[#B59A72]/30 bg-[#B59A72]/5'
+                  className={`py-2 px-4 rounded-xl ${
+                    isDark ? 'bg-white/5' : 'bg-[#B59A72]/10'
                   }`}
                 >
                   <h3 className="font-editorial text-lg sm:text-xl font-semibold tracking-wide">
                     {displayName}
-                    {hasPlusOne && plusOneName && (
-                      <span className="block text-xs font-sans-ui font-normal opacity-85 mt-0.5">
-                        &amp; {plusOneName}
+                    {hasPlusOne && (
+                      <span className="block text-xs font-sans-ui font-normal text-[#8C6D45] mt-0.5">
+                        {plusOneName ? `& ${plusOneName}` : '· Couple Admission (2 Seats)'}
                       </span>
                     )}
                   </h3>
@@ -585,9 +589,9 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
               </div>
 
               {/* Wedding Agenda, Venues & Scriptures on Portrait Card */}
-              <div className="pt-2 pb-1 border-t border-[#B59A72]/20 w-full space-y-1.5">
+              <div className="pt-2 pb-1 w-full space-y-1.5">
                 <p className="font-editorial italic text-xs text-[#8C6D45]">
-                  &ldquo;Therefore what God has joined together, let no one separate.&rdquo; — Mark 10:9
+                  &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
                 </p>
 
                 <p className="text-[11px] uppercase tracking-[0.18em] font-semibold text-[#292722] dark:text-[#FAF7F0]">
@@ -595,8 +599,8 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                 </p>
 
                 {/* Agenda events */}
-                <div className="space-y-1.5 text-left bg-black/5 dark:bg-white/5 p-2 rounded-xs border border-[#B59A72]/20 text-[11px]">
-                  <div className="border-b border-[#B59A72]/15 pb-1">
+                <div className="space-y-1.5 text-left bg-black/5 dark:bg-white/5 p-2 rounded-xl text-[11px]">
+                  <div className="pb-1">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold font-editorial text-xs text-[#292722] dark:text-[#FAF7F0]">
                         Wedding Benediction · 13:00
@@ -632,7 +636,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                 </div>
 
                 <p className="font-editorial italic text-[10px] text-neutral-500">
-                  &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo; — Joel 2:25
+                  &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo;
                 </p>
 
                 {/* Wax Seal Badge */}
@@ -777,7 +781,11 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
               </span>
             </div>
             <span className="text-[10px] font-mono text-[#D4AF37] px-2 py-0.5 rounded-full bg-white/10 shadow-xs">
-              {downloadingType === 'card' ? 'Landscape Ceremony Card' : 'QR Venue Gate Pass'}
+              {downloadingType === 'unified'
+                ? 'Unified Front & Back Invitation (2 Pages)'
+                : downloadingType === 'card'
+                ? 'Landscape Ceremony Card (Front)'
+                : 'QR Venue Gate Pass (Back)'}
             </span>
           </div>
 
@@ -833,66 +841,70 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
         </div>
       )}
 
-      {/* Two Separate PDF Download Buttons */}
+      {/* Unified Invitation Download (Front & Back Simultaneously) */}
       <div className="mt-4 w-full max-w-xl">
         <div className="flex items-center justify-between mb-2 px-0.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8C6D45]">
-            Separate PDF Downloads
+            Unified Invitation Download
           </span>
           <span className="text-[9px] text-neutral-500 font-sans uppercase tracking-wider">
-            300 DPI Archival Resolution
+            Front &amp; Back Included · 300 DPI Archival Resolution
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {/* Button 1: Ceremony Card (Landscape PDF) */}
+        {/* Master Unified Download Button */}
+        <button
+          type="button"
+          onClick={handleDownloadUnified}
+          disabled={downloadingType !== null}
+          className="w-full group relative flex flex-col items-start p-5 text-left bg-gradient-to-br from-[#292722] via-[#24211D] to-[#1C1B18] text-white rounded-2xl shadow-md hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+        >
+          <div className="flex items-center justify-between w-full mb-1.5">
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-[#D4AF37]" />
+              <span className="font-editorial text-base sm:text-lg font-medium text-white group-hover:text-[#D4AF37] transition-colors">
+                Download Complete Invitation &amp; Gate Pass (Front &amp; Back)
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#B59A72] text-[#1C1B18] group-hover:scale-105 transition-transform shadow-xs shrink-0">
+              {downloadingType === 'unified' ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#1C1B18]" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-neutral-300 font-sans leading-relaxed">
+            Downloads both sides unified into one document at the same time: Page 1 (Front: Bespoke Ceremony Keepsake Card with photo &amp; blessing) &amp; Page 2 (Back: Digital Venue Gate Pass with high-density QR code &amp; gate protocol).
+          </p>
+          <div className="mt-3 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-[#D4AF37]">
+            <span className="font-semibold">Complete 2-Page Document</span>
+            <span>·</span>
+            <span>Front &amp; Back Unified</span>
+            <span>·</span>
+            <span>Print-Ready A5</span>
+          </div>
+        </button>
+
+        {/* Secondary individual options */}
+        <div className="flex items-center justify-center gap-4 pt-1 text-[11px] text-neutral-500">
+          <span>Individual sides:</span>
           <button
             type="button"
             onClick={handleDownloadCard}
             disabled={downloadingType !== null}
-            className="group relative flex flex-col items-start p-3 text-left bg-[#FAF7F0] hover:bg-[#F3EDE2] rounded-xs shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-[#8C6D45] hover:underline transition-colors font-medium cursor-pointer disabled:opacity-50"
           >
-            <div className="flex items-center justify-between w-full mb-1">
-              <span className="font-editorial text-sm font-semibold text-[#292722] group-hover:text-[#8C6D45] transition-colors">
-                Ceremony Card (Landscape PDF)
-              </span>
-              <div className="p-1.5 rounded-xs bg-[#292722] text-[#D4AF37] group-hover:scale-105 transition-transform shadow-xs">
-                <Download className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <span className="text-[11px] text-neutral-600 font-sans leading-relaxed">
-              Landscape A5 keepsake card with bespoke ceremonial AI blessing and gold foil framing.
-            </span>
-            <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#8C6D45]">
-              <span className="font-semibold">Landscape PDF</span>
-              <span>·</span>
-              <span>Print-Ready A5</span>
-            </div>
+            Front Only (Ceremony Card)
           </button>
-
-          {/* Button 2: Digital Venue Pass (QR Pass PDF) */}
+          <span>·</span>
           <button
             type="button"
             onClick={handleDownloadPass}
             disabled={downloadingType !== null}
-            className="group relative flex flex-col items-start p-4 text-left bg-white hover:bg-neutral-50 rounded-xs shadow-md hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+            className="text-[#8C6D45] hover:underline transition-colors font-medium cursor-pointer disabled:opacity-50"
           >
-            <div className="flex items-center justify-between w-full mb-1">
-              <span className="font-editorial text-sm font-semibold text-[#292722] group-hover:text-[#8C6D45] transition-colors">
-                Digital Venue Pass (QR PDF)
-              </span>
-              <div className="p-1.5 rounded-xs bg-[#8C6D45] text-white group-hover:scale-105 transition-transform shadow-xs">
-                <ShieldCheck className="w-3.5 h-3.5" />
-              </div>
-            </div>
-            <span className="text-[11px] text-neutral-600 font-sans leading-relaxed">
-              Portrait admission pass with scannable high-density QR code and estate gate protocol.
-            </span>
-            <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#292722]">
-              <span className="font-semibold">Portrait PDF</span>
-              <span>·</span>
-              <span>QR Security Pass</span>
-            </div>
+            Back Only (QR Gate Pass)
           </button>
         </div>
       </div>

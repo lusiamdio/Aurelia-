@@ -16,8 +16,8 @@
  *   You can modify `TURKISH_MARCH_SCORE` (notes, tempo, chords) below to play any song.
  * ============================================================================
  */
-export const CUSTOM_WEDDING_AUDIO_URL: string = '/assets/aistudio/Number_One_cdd277d1.mp3';
-export const WEDDING_AUDIO_TRACK_TITLE: string = 'Number One';
+export const CUSTOM_WEDDING_AUDIO_URL: string = '/assets/aistudio/Jesus_Christ_Is_the_Best_Teacher_c9c0cf7c.mp3';
+export const WEDDING_AUDIO_TRACK_TITLE: string = 'Jesus Christ Is the Best Teacher';
 
 export interface MelodyNote {
   note: string;
@@ -57,7 +57,7 @@ export const TURKISH_MARCH_SCORE: WeddingSongScore = {
   tempo: 124,
   key: 'A Minor / A Major',
   vibeDescription: 'Mozart’s iconic Allegretto piano masterpiece, full of joyful celebration, buoyant energy, and classical brilliance.',
-  poeticVerse: '“Therefore what God has joined together, let no one separate.” — Mark 10:9',
+  poeticVerse: '“Therefore what God has joined together, let no one separate.”',
   melodyNotes: [
     // Theme A (A minor Allegretto motif)
     // Pick-up

@@ -46,8 +46,8 @@ app.post('/api/ai/chat', async (req, res) => {
 
     const systemInstruction = `You are the bespoke luxury wedding concierge representing ${coupleNames || 'Samson Ilunga & Kevine Bonganga'}'s wedding celebration in Cape Town, South Africa on ${date || 'Sunday, 20th December 2026'}.
 Venues & Schedule:
-- Wedding Benediction: Lion Voice Tabernacle (11 Lower Maynard Rd Wynberg Station, Tailan Building Basement Hall) at 13:00. Dress code: Vintage Wear. Scripture: "Therefore what God has joined together, let no one separate. — Mark 10:9".
-- Evening Reception: Rooftop, 39 Salt River Road, Salt River, Cape Town from 18:00 to 21:00. Dress code: Gala Wear. Scripture: "I will restore to you the years that the swarming locust has eaten. — Joel 2:25".
+- Wedding Benediction: Lion Voice Tabernacle (11 Lower Maynard Rd Wynberg Station, Tailan Building Basement Hall) at 13:00. Dress code: Vintage Wear. Scripture: "Therefore what God has joined together, let no one separate.".
+- Evening Reception: Rooftop, 39 Salt River Road, Salt River, Cape Town from 18:00 to 21:00. Dress code: Gala Wear. Scripture: "I will restore to you the years that the swarming locust has eaten.".
 Essential Policies:
 - Transport Provision: There will be NO transport provision provided. Guests must arrange their own private vehicles, carpooling, or Uber between Wynberg and Salt River.
 - Children Policy: Only young children aged 0 to 5 years can attend the evening event. Outside arrangements are requested for older children.
@@ -89,12 +89,12 @@ app.post('/api/ai/wording', async (req, res) => {
     const { type, partner1, partner2, venue, mood } = req.body;
     if (!ai) {
       return res.json({
-        wording: `Together with their families, ${partner1 || 'Samson'} and ${partner2 || 'Kevine'} request the pleasure of your company to celebrate their sacred union at ${venue || 'Lion Voice Tabernacle & Rooftop Salt River'}. "Therefore what God has joined together, let no one separate. — Mark 10:9"`
+        wording: `Together with their families, ${partner1 || 'Samson'} and ${partner2 || 'Kevine'} request the pleasure of your company to celebrate their sacred union at ${venue || 'Lion Voice Tabernacle & Rooftop Salt River'}. "Therefore what God has joined together, let no one separate."`
       });
     }
 
     const prompt = `Write a luxury, evocative wedding ${type || 'invitation wording'} for ${partner1 || 'Samson Ilunga'} & ${partner2 || 'Kevine Bonganga'} getting married in Cape Town.
-Scriptures: "Therefore what God has joined together, let no one separate. — Mark 10:9" and "I will restore to you the years that the swarming locust has eaten. — Joel 2:25".
+Scriptures: "Therefore what God has joined together, let no one separate." and "I will restore to you the years that the swarming locust has eaten."
 Tone: ${mood || 'European regal elegance with warm biblical grace and poetic romance'}.
 Provide 2 short options: Option 1 (Classic Formal) and Option 2 (Poetic Romantic). Plain text only.`;
 
@@ -178,7 +178,7 @@ app.post('/api/pdf/gemini-content', async (req, res) => {
       if (type === 'card') {
         return res.json({
           blessing: `May your gracious presence elevate this sacred union as Samson and Kevine unite their hearts before God and family. We hold your cherished presence in deepest honour.`,
-          proclamation: `Therefore what God has joined together, let no one separate. — Mark 10:9`
+          proclamation: `Therefore what God has joined together, let no one separate.`
         });
       } else {
         return res.json({
@@ -191,13 +191,13 @@ app.post('/api/pdf/gemini-content', async (req, res) => {
     if (type === 'card') {
       const prompt = `You are a royal wedding calligrapher and poet crafting a personalized ceremonial dedication on an official luxury landscape wedding invitation card for ${coupleNames || 'Samson Ilunga & Kevine Bonganga'}'s wedding celebration in Cape Town, Western Cape.
 Venues: Lion Voice Tabernacle (13:00) & Rooftop 39 Salt River Road (18:00-21:00).
-Scripture: "Therefore what God has joined together, let no one separate. — Mark 10:9"
+Scripture: "Therefore what God has joined together, let no one separate."
 Honoured Guest: ${guestName || 'Honoured Guest'}
 ${hasPlusOne ? `Accompanying Guest: ${plusOneName || 'Guest'}` : 'Individual Attendee'}
 
 Provide:
 1. "blessing": A bespoke, poetic, and heartwarming ceremonial dedication honoring this guest's presence and God's blessings over the union (2 sentences, 25-35 words, dignified, eloquent, and deeply touching).
-2. "proclamation": "Therefore what God has joined together, let no one separate. — Mark 10:9".
+2. "proclamation": "Therefore what God has joined together, let no one separate.".
 
 Respond in valid JSON format only:
 {
@@ -216,7 +216,7 @@ Respond in valid JSON format only:
       const parsed = JSON.parse(response.text || '{}');
       return res.json({
         blessing: parsed.blessing || `May your gracious presence elevate this sacred union as Samson and Kevine unite their hearts before God and family.`,
-        proclamation: parsed.proclamation || `Therefore what God has joined together, let no one separate. — Mark 10:9`
+        proclamation: parsed.proclamation || `Therefore what God has joined together, let no one separate.`
       });
     } else {
       // type === 'pass'
@@ -255,7 +255,7 @@ Respond in valid JSON format only:
     console.error('Gemini PDF generation error:', err);
     res.json({
       blessing: `May your presence grace this union as two souls entwine their destinies in Cape Town. We hold your companionship in profound reverence.`,
-      proclamation: `Therefore what God has joined together, let no one separate. — Mark 10:9`,
+      proclamation: `Therefore what God has joined together, let no one separate.`,
       protocolNote: `Kindly present this verified gate pass upon arrival at Lion Voice Tabernacle (13:00) and Rooftop Salt River (18:00).`,
       dressCodeRemark: `Church Ceremony: Vintage Wear · Dinning Ceremony: Gala Wear`
     });
@@ -271,7 +271,7 @@ function getDefaultWeddingSongScore(coupleNames?: string) {
     tempo: 74,
     key: 'D Major',
     vibeDescription: 'An evocative acoustic grand piano overture with ascending harp arpeggios and warm string ensemble.',
-    poeticVerse: '“Therefore what God has joined together, let no one separate.” — Mark 10:9',
+    poeticVerse: '“Therefore what God has joined together, let no one separate.”',
     melodyNotes: [
       { note: 'D4', freq: 293.66, duration: 0.8, delay: 0.0 },
       { note: 'F#4', freq: 369.99, duration: 0.8, delay: 0.8 },
@@ -317,7 +317,7 @@ app.post('/api/ai/wedding-song', async (req, res) => {
 
     // Compose a bespoke multi-track musical score using Gemini 3.8 Flash
     const compositionPrompt = `You are an elite royal wedding overture composer. Compose a romantic wedding overture song for Samson Ilunga & Kevine Bonganga's wedding in Cape Town ("Celebration of Love", Sunday, 20th December 2026).
-Theme: "Therefore what God has joined together, let no one separate. — Mark 10:9".
+Theme: "Therefore what God has joined together, let no one separate.".
 Respond with a JSON object strictly following this structure:
 {
   "title": "A romantic title e.g. 'Overture to Eternal Love (Samson & Kevine)'",
@@ -373,13 +373,140 @@ Respond with a JSON object strictly following this structure:
       tempo: parsed.tempo || 74,
       key: parsed.key || 'D Major',
       vibeDescription: parsed.vibeDescription || 'A tender, radiant acoustic piano serenade with soft orchestral string harmonics.',
-      poeticVerse: parsed.poeticVerse || 'Therefore what God has joined together, let no one separate. — Mark 10:9',
+      poeticVerse: parsed.poeticVerse || 'Therefore what God has joined together, let no one separate.',
       melodyNotes: parsed.melodyNotes || getDefaultWeddingSongScore(coupleNames).melodyNotes,
       harmonyChords: parsed.harmonyChords || getDefaultWeddingSongScore(coupleNames).harmonyChords
     });
   } catch (err: any) {
     console.error('Wedding song generator error:', err);
     return res.json(getDefaultWeddingSongScore(req.body.coupleNames));
+  }
+});
+
+// Real-Time CSV Export & Gemini AI Roster Processing
+app.post('/api/export/csv', (req, res) => {
+  try {
+    const { guests, weddingTitle } = req.body;
+    const guestList = Array.isArray(guests) ? guests : [];
+    const headers = [
+      'Pass ID',
+      'Guest Full Name',
+      'Party Type (Single / Couple)',
+      'Seats Reserved',
+      'RSVP Status',
+      'Dietary Requirements',
+      'Checked In',
+      'Admission Timestamp',
+      'Registration Date'
+    ];
+
+    const rows = guestList.map((g: any) => {
+      const isCouple = g.attendanceType === 'couple' || g.hasPlusOne;
+      const partyLabel = isCouple ? 'Couple' : 'Single';
+      const seats = isCouple ? '2' : '1';
+      return [
+        `"${g.id || ''}"`,
+        `"${(g.fullName || '').replace(/"/g, '""')}"`,
+        `"${partyLabel}"`,
+        seats,
+        `"${g.status || 'pending'}"`,
+        `"${(g.dietaryRequirements || '').replace(/"/g, '""')}"`,
+        g.checkedIn ? 'Yes' : 'No',
+        `"${g.checkedInAt || ''}"`,
+        `"${g.invitationGeneratedAt || ''}"`
+      ].join(',');
+    });
+
+    const csvData = [headers.join(','), ...rows].join('\r\n');
+    const filename = `${(weddingTitle || 'wedding').toLowerCase().replace(/\s+/g, '_')}_guests_realtime.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csvData);
+  } catch (err: any) {
+    console.error('CSV real-time export error:', err);
+    return res.status(500).json({ error: 'Failed to generate real-time CSV export' });
+  }
+});
+
+// Gemini AI Real-Time CSV Roster Analysis & Export
+app.post('/api/ai/export-csv', async (req, res) => {
+  try {
+    const { guests, weddingTitle } = req.body;
+    const guestList = Array.isArray(guests) ? guests : [];
+
+    // Calculate real-time numbers
+    const totalSingle = guestList.filter((g: any) => g.attendanceType !== 'couple' && !g.hasPlusOne).length;
+    const totalCouples = guestList.filter((g: any) => g.attendanceType === 'couple' || g.hasPlusOne).length;
+    const attendingCount = guestList.filter((g: any) => g.status === 'attending').length;
+    const totalSeats = guestList.filter((g: any) => g.status === 'attending')
+      .reduce((acc: number, g: any) => acc + (g.attendanceType === 'couple' || g.hasPlusOne ? 2 : 1), 0);
+
+    let aiInsight = `Real-time summary: ${guestList.length} total invitations (${totalCouples} couples, ${totalSingle} singles). Total confirmed seats: ${totalSeats}.`;
+
+    if (ai) {
+      try {
+        const prompt = `Analyze this real-time wedding guest roster for ${weddingTitle || 'Samson & Kevine'}:
+Guests count: ${guestList.length}
+Couples: ${totalCouples} (2 seats each)
+Singles: ${totalSingle} (1 seat each)
+Confirmed attending guests: ${attendingCount}
+Total venue seats required: ${totalSeats}
+Sample dietary requirements: ${guestList.map((g: any) => g.dietaryRequirements).filter(Boolean).slice(0, 10).join(', ') || 'None specified'}
+
+Provide a 2-sentence executive seating and catering summary for the couple's banquet team. Keep it under 50 words.`;
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: prompt
+        });
+        if (response.text) {
+          aiInsight = response.text.trim();
+        }
+      } catch (e) {
+        console.warn('Gemini AI summary fallback:', e);
+      }
+    }
+
+    const headers = [
+      'Pass ID',
+      'Guest Full Name',
+      'Party Type',
+      'Seats Reserved',
+      'RSVP Status',
+      'Dietary Requirements',
+      'Checked In',
+      'Admission Timestamp'
+    ];
+
+    const rows = guestList.map((g: any) => {
+      const isCouple = g.attendanceType === 'couple' || g.hasPlusOne;
+      return [
+        `"${g.id || ''}"`,
+        `"${(g.fullName || '').replace(/"/g, '""')}"`,
+        `"${isCouple ? 'Couple' : 'Single'}"`,
+        isCouple ? '2' : '1',
+        `"${g.status || 'pending'}"`,
+        `"${(g.dietaryRequirements || '').replace(/"/g, '""')}"`,
+        g.checkedIn ? 'Yes' : 'No',
+        `"${g.checkedInAt || ''}"`
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\r\n');
+
+    return res.json({
+      success: true,
+      csvContent,
+      aiInsight,
+      totalCouples,
+      totalSingle,
+      totalSeats,
+      totalGuests: guestList.length
+    });
+  } catch (err: any) {
+    console.error('Gemini AI export error:', err);
+    return res.status(500).json({ error: 'Failed to process AI CSV export' });
   }
 });
 

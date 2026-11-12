@@ -23,7 +23,11 @@ import {
   X,
   Menu,
   Layers,
-  LayoutGrid
+  LayoutGrid,
+  User,
+  Users,
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MotionPhotoCardStack } from './MotionPhotoCardStack';
@@ -35,6 +39,10 @@ interface WeddingMicrositeProps {
   onBackToApp: () => void;
   onGuestRegistered: (guest: GuestInvitation) => void;
   onSongRequested?: (song: SongRequest) => void;
+  isCoupleAdmin?: boolean;
+  onOpenCoupleLogin?: () => void;
+  onOpenDashboard?: () => void;
+  onLogoutAdmin?: () => void;
 }
 
 interface ScrollPopPhotoProps {
@@ -109,6 +117,21 @@ const ScrollPopPhoto: React.FC<ScrollPopPhotoProps> = ({
 
 const JOURNEY_GALLERY_PHOTOS = [
   {
+    id: 'jp-w0068',
+    src: '/src/assets/images/IMG-20261111-WA0068.jpg',
+    aspect: 'aspect-4/5'
+  },
+  {
+    id: 'jp-w0166',
+    src: '/src/assets/images/IMG-20261107-WA0166.jpg',
+    aspect: 'aspect-4/5'
+  },
+  {
+    id: 'jp-w0069',
+    src: '/src/assets/images/IMG-20261111-WA0069.jpg',
+    aspect: 'aspect-3/4'
+  },
+  {
     id: 'jp-1',
     src: '/src/assets/images/IMG-20261107-WA0121.jpg',
     aspect: 'aspect-4/5'
@@ -137,11 +160,6 @@ const JOURNEY_GALLERY_PHOTOS = [
     id: 'jp-6',
     src: '/src/assets/images/IMG-20261107-WA0165.jpg',
     aspect: 'aspect-3/4'
-  },
-  {
-    id: 'jp-7',
-    src: '/src/assets/images/IMG-20261107-WA0166.jpg',
-    aspect: 'aspect-4/5'
   },
   {
     id: 'jp-8',
@@ -176,6 +194,18 @@ const JOURNEY_GALLERY_PHOTOS = [
 ];
 
 const MICROSITE_SLIDES = [
+  {
+    id: 'slide-0',
+    title: 'The Sacred Covenant',
+    quote: 'Therefore what God has joined together, let no one separate.',
+    image: '/src/assets/images/IMG-20261107-WA0166.jpg'
+  },
+  {
+    id: 'slide-0b',
+    title: 'Love in Full Splendor',
+    quote: 'A celebration of grace, faith, and unending romance.',
+    image: '/src/assets/images/IMG-20261111-WA0068.jpg'
+  },
   {
     id: 'slide-1',
     title: 'Two Hearts, One Story',
@@ -212,7 +242,11 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   wedding,
   onBackToApp,
   onGuestRegistered,
-  onSongRequested
+  onSongRequested,
+  isCoupleAdmin,
+  onOpenCoupleLogin,
+  onOpenDashboard,
+  onLogoutAdmin
 }) => {
   // Opening Interactive Animated Sequence State (Managed by OpeningInvitationExperience)
   const [showOpeningOverlay, setShowOpeningOverlay] = useState(true);
@@ -231,7 +265,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const [isCarouselPaused, setIsCarouselPaused] = useState(false);
   const [, setCarouselProgress] = useState(0);
 
-  // Audio Atmosphere State (Number One - Romantic Wedding Song)
+  // Audio Atmosphere State (Jesus Christ Is the Best Teacher - Wedding Song)
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const audioPlayerRef = useRef<WeddingAudioPlayer | null>(null);
   const [songVolume, setSongVolume] = useState(0.7);
@@ -240,12 +274,10 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   // Countdown timer to wedding date (Sunday, 20th December 2026)
   const [timeLeft, setTimeLeft] = useState({ days: 410, hours: 14, minutes: 22, seconds: 40 });
 
-  // Guest invitation modal / inline generator state
+  // Guest invitation modal / inline generator state: I am Single vs I am Couple
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
-  const [hasPlusOne, setHasPlusOne] = useState(false);
-  const [plusOneName, setPlusOneName] = useState('');
-  const [plusOneDietary, setPlusOneDietary] = useState('');
+  const [attendanceType, setAttendanceType] = useState<'single' | 'couple'>('single');
   const [dietary, setDietary] = useState('');
   const [attendance, setAttendance] = useState<'attending' | 'declined'>('attending');
   const [generatedPass, setGeneratedPass] = useState<GuestInvitation | null>(null);
@@ -256,7 +288,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   // Touch handling for mobile swipe
   const touchStartX = useRef<number | null>(null);
 
-  // 2. Initialize Number One Wedding Audio Atmosphere
+  // 2. Initialize Jesus Christ Is the Best Teacher Wedding Audio Atmosphere
   useEffect(() => {
     if (!audioPlayerRef.current) {
       audioPlayerRef.current = new WeddingAudioPlayer((playing) => {
@@ -369,6 +401,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
     e.preventDefault();
     if (!guestName.trim()) return;
 
+    const isCouple = attendanceType === 'couple';
     const guestId = `AUR-${Math.floor(1000 + Math.random() * 9000)}`;
     const guest: GuestInvitation = {
       id: guestId,
@@ -376,11 +409,10 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
       email: guestEmail.trim(),
       status: attendance,
       eventsAttending: wedding.events.map((ev) => ev.id),
-      hasPlusOne,
-      plusOneName: hasPlusOne ? plusOneName.trim() : undefined,
-      plusOneDietary: hasPlusOne ? plusOneDietary.trim() : undefined,
-      plusOneStatus: hasPlusOne ? 'pending' : undefined,
-      plusOneAllowed: true,
+      attendanceType,
+      hasPlusOne: isCouple,
+      plusOneStatus: isCouple ? 'confirmed' : undefined,
+      plusOneAllowed: isCouple,
       dietaryRequirements: dietary.trim(),
       invitationGeneratedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
       checkedIn: false
@@ -421,26 +453,16 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
         />
       )}
 
-      {/* Top Floating Microsite Administrative & Minimal Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-[#1C1B18]/92 text-[#FAF7F0] backdrop-blur-md text-xs py-3 px-4 sm:px-6 flex items-center justify-between shadow-md">
-        {/* Left: Couple Back link & Domain */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBackToApp}
-            className="flex items-center gap-1.5 text-[#D4AF37] hover:text-white transition-colors min-h-[44px] py-1"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="font-semibold uppercase tracking-wider text-[11px] hidden sm:inline">
-              Back to Aurelia Studio
-            </span>
-          </button>
-          <span className="opacity-30 hidden sm:inline">|</span>
-          <span className="font-mono text-[11px] text-[#D4AF37]/90 hidden md:inline">
-            https://{wedding.customDomain || 'samsonandkevine.wedding'}
+      {/* Top Floating Microsite Minimal Navigation Bar */}
+      <header className="sticky top-0 z-50 bg-[#1C1B18]/94 text-[#FAF7F0] backdrop-blur-md text-xs py-3 px-4 sm:px-6 flex items-center justify-between shadow-lg">
+        {/* Left: Couple Branding */}
+        <div className="flex items-center gap-2.5">
+          <span className="font-editorial text-base sm:text-lg font-normal tracking-wide text-[#FAF7F0]">
+            Samson &amp; Kevine
           </span>
         </div>
 
-        {/* Center: Minimal Navigation Menu (Our Story, The Wedding, Schedule, Gallery, Music, RSVP) */}
+        {/* Center: Minimal Navigation Menu */}
         <nav className="hidden lg:flex items-center gap-6 text-[11px] uppercase tracking-[0.16em] text-neutral-300 font-medium">
           <a
             href="#microsite-story"
@@ -474,17 +496,17 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           </a>
         </nav>
 
-        {/* Right: Audio Player Toggle & Mobile Menu Trigger */}
+        {/* Right: Audio Player Toggle, Sign In & Mobile Menu Trigger */}
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={handleToggleAudio}
-            className={`px-3 py-1.5 rounded-full text-[10px] transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-full text-[10px] transition-all flex items-center gap-1.5 cursor-pointer ${
               isPlayingAudio
                 ? 'bg-[#D4AF37] text-[#1C1B18] font-semibold shadow-sm'
                 : 'bg-white/15 text-white/90 hover:bg-white/25 shadow-xs'
             }`}
-            title="Number One — Wedding Song"
+            title="Jesus Christ Is the Best Teacher — Wedding Song"
           >
             {isPlayingAudio ? (
               <>
@@ -493,23 +515,57 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                   <span className="w-1 h-2 bg-[#1C1B18] animate-ping rounded-full" />
                   <span className="w-1 h-3.5 bg-[#1C1B18] animate-pulse rounded-full" />
                 </div>
-                <span className="hidden sm:inline">Number One: Playing</span>
+                <span className="hidden sm:inline">Jesus Christ Is the Best Teacher: Playing</span>
                 <span className="sm:hidden">Playing</span>
               </>
             ) : (
               <>
                 <Music className="w-3.5 h-3.5 text-[#D4AF37]" />
-                <span className="hidden sm:inline">Play Number One</span>
-                <span className="sm:hidden">Play Song</span>
+                <span className="hidden sm:inline">Play Audio</span>
+                <span className="sm:hidden">Play</span>
               </>
             )}
           </button>
+
+          {/* Couple Admin Sign In or Dashboard Access */}
+          {isCoupleAdmin ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onOpenDashboard}
+                className="px-3.5 py-1.5 rounded-full bg-[#D4AF37] hover:bg-[#8C6D45] text-[#1C1B18] hover:text-white text-[11px] font-semibold uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+              >
+                Dashboard
+              </button>
+              {onLogoutAdmin && (
+                <button
+                  type="button"
+                  onClick={onLogoutAdmin}
+                  className="hidden sm:inline-block text-[10px] uppercase text-neutral-400 hover:text-white transition-colors cursor-pointer px-1 py-1"
+                >
+                  Sign Out
+                </button>
+              )}
+            </div>
+          ) : (
+            onOpenCoupleLogin && (
+              <button
+                type="button"
+                onClick={onOpenCoupleLogin}
+                className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-[#FAF7F0] hover:text-[#D4AF37] text-[11px] font-semibold uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                title="Couple Admin Sign In"
+              >
+                <Lock className="w-3 h-3 text-[#D4AF37]" />
+                <span>Sign In</span>
+              </button>
+            )
+          )}
 
           {/* Mobile Navigation Drawer Toggle */}
           <button
             type="button"
             onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-            className="lg:hidden p-2 rounded-full bg-white/10 hover:bg-white/20 text-[#FAF7F0] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="lg:hidden p-2 rounded-full bg-white/10 hover:bg-white/20 text-[#FAF7F0] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
             aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
           >
             {isMobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -556,6 +612,32 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             >
               RSVP
             </a>
+            <div className="pt-2">
+              {isCoupleAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileNavOpen(false);
+                    onOpenDashboard?.();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-full bg-[#D4AF37] text-[#1C1B18] font-semibold text-xs uppercase tracking-wider cursor-pointer"
+                >
+                  Open Couple Dashboard
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileNavOpen(false);
+                    onOpenCoupleLogin?.();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-full bg-white/10 text-white font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Lock className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Couple Admin Sign In</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -604,43 +686,48 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           <div className="absolute inset-0 z-20 bg-radial from-transparent via-[#1C1B18]/30 to-[#1C1B18]/70 pointer-events-none" />
         </div>
 
-        {/* Hero Content Overlay */}
-        <div className="relative z-30 max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center flex flex-col items-center">
-          {/* Couple Monogram Crest */}
-          <div className="w-14 h-14 rounded-full bg-[#D4AF37]/20 flex items-center justify-center mb-5 text-[#D4AF37] backdrop-blur-md shadow-xl">
-            <span className="font-editorial text-lg italic tracking-wider">{wedding.monogram || 'S & K'}</span>
-          </div>
-
-          <p className="text-[11px] sm:text-xs font-editorial tracking-[0.35em] uppercase text-[#D4AF37] font-semibold mb-2">
-            Together With Their Families
-          </p>
-
-          <p className="font-editorial italic text-base sm:text-lg text-[#F3EDE2]/90 mb-3">
-            Two Hearts, One Beautiful Story
-          </p>
-
-          <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-[#D4AF37]/90 font-medium mb-3">
-            Celebration of Love
-          </p>
-
-          <h1 className="font-editorial text-4xl sm:text-6xl lg:text-7xl font-normal leading-tight tracking-tight text-[#FAF7F0] drop-shadow-md break-words max-w-3xl">
-            {wedding.partner1}
-            <span className="block italic text-2xl sm:text-4xl my-2 text-[#D4AF37] font-light">
-              &amp;
-            </span>
-            {wedding.partner2}
+        {/* Hero Content Overlay — Strictly Couple Names, Date, and Location */}
+        <div className="relative z-30 max-w-4xl mx-auto px-4 sm:px-6 py-28 sm:py-36 text-center flex flex-col items-center justify-center">
+          <h1 className="font-editorial text-5xl sm:text-7xl lg:text-8xl font-normal leading-tight tracking-tight text-[#FAF7F0] drop-shadow-lg">
+            Samson &amp; Kevine
           </h1>
 
-          <p className="font-editorial italic text-xs sm:text-base text-[#D4AF37] mt-3 tracking-wide max-w-xl mx-auto drop-shadow-xs">
-            &ldquo;Therefore what God has joined together, let no one separate.&rdquo; — Mark 10:9
+          <p className="font-editorial text-xl sm:text-2xl text-[#D4AF37] mt-6 sm:mt-7 tracking-[0.25em] font-medium drop-shadow-md">
+            20 . 12 . 2026
           </p>
 
-          <p className="font-editorial text-sm sm:text-lg text-[#F3EDE2]/95 mt-2 tracking-wide font-medium">
-            20 · 12 · 2026 · CAPE TOWN, SOUTH AFRICA
+          <p className="font-editorial text-sm sm:text-lg text-[#FAF7F0]/90 mt-2.5 tracking-[0.22em] uppercase font-light drop-shadow-sm">
+            Cape Town . South Africa
+          </p>
+        </div>
+
+        {/* Carousel Navigation Arrows */}
+        <button
+          onClick={prevSlide}
+          className="absolute left-3 sm:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-md shadow-lg flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+          aria-label="Previous photo"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <button
+          onClick={nextSlide}
+          className="absolute right-3 sm:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-md shadow-lg flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+          aria-label="Next photo"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </section>
+
+      {/* 1.2 COUNTDOWN & ACTION BUTTONS SECTION */}
+      <section className="relative z-30 py-14 sm:py-16 bg-[#161513] text-white shadow-2xl">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          {/* Holy Matrimony Scripture Verse without chapter citation */}
+          <p className="font-editorial italic text-base sm:text-lg text-[#D4AF37] max-w-xl mx-auto mb-7 tracking-wide drop-shadow-sm">
+            &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
           </p>
 
           {/* Live Countdown Timer */}
-          <div className="mt-8 flex items-center justify-center gap-2.5 sm:gap-6 text-center flex-wrap">
+          <div className="flex items-center justify-center gap-3 sm:gap-6 text-center flex-wrap mb-9">
             {[
               { val: timeLeft.days, label: 'Days' },
               { val: timeLeft.hours, label: 'Hours' },
@@ -649,25 +736,25 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             ].map((unit) => (
               <div
                 key={unit.label}
-                className="bg-[#1C1B18]/80 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl shadow-lg min-w-[58px] sm:min-w-[72px]"
+                className="bg-[#22201D] backdrop-blur-md px-4 sm:px-6 py-3.5 rounded-2xl shadow-xl min-w-[70px] sm:min-w-[88px] transform hover:scale-105 transition-transform"
               >
-                <div className="font-editorial text-2xl sm:text-3xl font-normal tabular-nums text-[#FAF7F0]">
+                <div className="font-editorial text-3xl sm:text-4xl font-normal tabular-nums text-[#FAF7F0]">
                   {unit.val}
                 </div>
-                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#D4AF37]">
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#D4AF37] mt-1 font-mono font-medium">
                   {unit.label}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Call to Actions */}
-          <div className="mt-10 flex flex-col sm:flex-row items-center gap-3.5 w-full max-w-md sm:max-w-none justify-center">
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md mx-auto justify-center">
             <button
               onClick={() => {
                 document.getElementById('microsite-rsvp-section')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-full sm:w-auto px-8 py-4 bg-[#D4AF37] hover:bg-[#8C6D45] text-[#1C1B18] hover:text-white text-xs font-semibold tracking-[0.18em] uppercase rounded-full transition-all shadow-xl min-h-[44px]"
+              className="w-full sm:w-auto px-8 py-4 bg-[#D4AF37] hover:bg-[#8C6D45] text-[#1C1B18] hover:text-white text-xs font-semibold tracking-[0.18em] uppercase rounded-full transition-all shadow-xl min-h-[44px] cursor-pointer"
             >
               Generate Your Guest Pass &amp; RSVP
             </button>
@@ -675,36 +762,12 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
               onClick={() => {
                 document.getElementById('microsite-welcome')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-full sm:w-auto px-6 py-4 bg-white/15 hover:bg-white/25 text-[#FAF7F0] backdrop-blur-md text-xs font-semibold tracking-[0.16em] uppercase rounded-full transition-all shadow-md min-h-[44px]"
+              className="w-full sm:w-auto px-7 py-4 bg-white/10 hover:bg-white/20 text-[#FAF7F0] backdrop-blur-md text-xs font-semibold tracking-[0.16em] uppercase rounded-full transition-all shadow-md min-h-[44px] cursor-pointer"
             >
               Explore Celebration ↓
             </button>
           </div>
-
-          {/* Subtle Scroll to Explore Indicator */}
-          <div className="mt-12 flex flex-col items-center gap-1 opacity-80 hover:opacity-100 transition-opacity">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[#D4AF37] font-semibold">
-              Scroll to Explore
-            </span>
-            <ChevronDown className="w-4 h-4 text-[#D4AF37] animate-bounce" />
-          </div>
         </div>
-
-        {/* Carousel Navigation Arrows */}
-        <button
-          onClick={prevSlide}
-          className="absolute left-3 sm:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-md shadow-lg flex items-center justify-center transition-transform hover:scale-105"
-          aria-label="Previous photo"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <button
-          onClick={nextSlide}
-          className="absolute right-3 sm:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-md shadow-lg flex items-center justify-center transition-transform hover:scale-105"
-          aria-label="Next photo"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
       </section>
 
       {/* 1.5 WELCOME MESSAGE (THE ART OF FOREVER) */}
@@ -921,21 +984,23 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
+          <div className="flex items-center justify-center gap-4 sm:gap-8 flex-wrap">
             {[
-              { name: 'Vintage Cream', color: '#F3EDE2' },
-              { name: 'Warm Gold', color: '#B59A72' },
-              { name: 'Gala Midnight', color: '#1C1B18' },
-              { name: 'Champagne Ochre', color: '#D4AF37' },
-              { name: 'Heritage Charcoal', color: '#292722' }
+              { name: 'Olive Green', color: '#556B2F', hex: '#556B2F' },
+              { name: 'Peach', color: '#FAD1AF', hex: '#FAD1AF' },
+              { name: 'Black', color: '#1C1B18', hex: '#1C1B18' },
+              { name: 'Beige', color: '#E8DEC8', hex: '#E8DEC8' }
             ].map((swatch) => (
               <div key={swatch.name} className="flex flex-col items-center gap-1.5">
                 <div
-                  className="w-8 h-8 rounded-full shadow-md"
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-md transition-transform hover:scale-110"
                   style={{ backgroundColor: swatch.color }}
                 />
-                <span className="text-[10px] text-neutral-600 uppercase tracking-wider">
+                <span className="text-xs font-editorial font-bold text-[#292722] tracking-wider">
                   {swatch.name}
+                </span>
+                <span className="text-[10px] text-neutral-500 font-mono -mt-1">
+                  {swatch.hex}
                 </span>
               </div>
             ))}
@@ -949,7 +1014,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           {/* Top Scripture */}
           <div className="inline-block px-5 py-2.5 rounded-full bg-[#8C6D45]/10 mb-3 shadow-sm">
             <span className="font-editorial italic text-xs sm:text-sm text-[#8C6D45] font-semibold">
-              &ldquo;Therefore what God has joined together, let no one separate.&rdquo; — Mark 10:9
+              &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
             </span>
           </div>
 
@@ -979,7 +1044,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                 <h3 className="font-editorial text-2xl sm:text-3xl text-[#292722] mb-3">
                   {evt.title}
                 </h3>
-                <div className="space-y-2 text-xs text-neutral-700 mb-4 bg-white/70 p-4 rounded-xl shadow-xs">
+                <div className="space-y-2.5 text-xs text-neutral-700 mb-4 bg-white/70 p-4 rounded-xl shadow-xs">
                   <div className="flex items-start gap-2">
                     <Clock className="w-4 h-4 text-[#8C6D45] mt-0.5 shrink-0" />
                     <div>
@@ -988,9 +1053,18 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                   </div>
                   <div className="flex items-start gap-2">
                     <MapPin className="w-4 h-4 text-[#8C6D45] mt-0.5 shrink-0" />
-                    <div>
+                    <div className="flex-1">
                       <span className="font-semibold text-[#292722] block">{evt.venue}</span>
-                      <span className="text-neutral-600 block mt-0.5 text-[11px]">Address: {evt.address}</span>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${evt.venue}, ${evt.address}`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-neutral-700 hover:text-[#8C6D45] group inline-flex items-center gap-1.5 mt-0.5 text-[11px] underline decoration-[#8C6D45]/40 hover:decoration-[#8C6D45] transition-colors"
+                        title="Click to open directions in Google Maps"
+                      >
+                        <span>Address: {evt.address}</span>
+                        <ExternalLink className="w-3 h-3 text-[#8C6D45] shrink-0 opacity-80 group-hover:opacity-100" />
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -999,32 +1073,42 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                 </p>
               </div>
 
-              <div className="mt-5 pt-3 flex items-center justify-between text-[11px]">
+              <div className="mt-5 pt-3 flex items-center justify-between text-[11px] flex-wrap gap-2">
                 <span className="text-neutral-500 font-medium">Attire: <strong className="text-[#292722]">{evt.dressCode}</strong></span>
-                <a
-                  href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-                    `Samson & Kevine Wedding: ${evt.title}`
-                  )}&details=${encodeURIComponent(evt.description)}&location=${encodeURIComponent(`${evt.venue}, ${evt.address}`)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[#8C6D45] hover:underline flex items-center gap-1 font-medium min-h-[44px]"
-                >
-                  <span>Add to Google Cal</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${evt.venue}, ${evt.address}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#8C6D45] hover:underline flex items-center gap-1 font-medium min-h-[44px]"
+                    title="Open in Google Maps"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>View Map</span>
+                  </a>
+                  <span className="text-neutral-300">·</span>
+                  <a
+                    href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+                      `Samson & Kevine Wedding: ${evt.title}`
+                    )}&details=${encodeURIComponent(evt.description)}&location=${encodeURIComponent(`${evt.venue}, ${evt.address}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#8C6D45] hover:underline flex items-center gap-1 font-medium min-h-[44px]"
+                  >
+                    <span>Add to Cal</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Bottom Scripture Quote Banner */}
+        {/* Bottom Scripture Quote Banner without chapter citation */}
         <div className="text-center max-w-2xl mx-auto p-6 rounded-2xl bg-[#FAF7F0] shadow-md">
           <p className="font-editorial italic text-base sm:text-lg text-[#292722]">
             &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo;
           </p>
-          <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#8C6D45] font-semibold block mt-1.5">
-            — Joel 2:25
-          </span>
         </div>
       </section>
 
@@ -1206,61 +1290,42 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                       </button>
                     </div>
 
-                    {/* Plus-One Management Selection */}
-                    <div className="p-4 bg-[#FAF7F0] rounded-xl shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-semibold text-xs text-[#292722] block">
-                            Confirm Accompanying Plus-One (+1)
-                          </span>
-                          <span className="text-[11px] text-neutral-500">
-                            Reserve an additional seat for a spouse or partner
-                          </span>
-                        </div>
+                    {/* Attendance Type Selector: I am Single vs I am Couple */}
+                    <div className="p-4 sm:p-5 bg-[#FAF7F0] rounded-2xl shadow-xs text-left">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#292722] mb-2.5">
+                        Attendance Status <span className="text-[#8C6D45]">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
-                          onClick={() => setHasPlusOne(!hasPlusOne)}
-                          className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${
-                            hasPlusOne ? 'bg-[#8C6D45]' : 'bg-neutral-300'
+                          onClick={() => setAttendanceType('single')}
+                          className={`py-3 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] ${
+                            attendanceType === 'single'
+                              ? 'bg-[#292722] text-[#FAF7F0] shadow-md'
+                              : 'bg-white text-neutral-600 hover:bg-neutral-100 shadow-xs'
                           }`}
                         >
-                          <div
-                            className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                              hasPlusOne ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
+                          <User className="w-4 h-4 text-[#D4AF37]" />
+                          <span>I am Single</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAttendanceType('couple')}
+                          className={`py-3 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] ${
+                            attendanceType === 'couple'
+                              ? 'bg-[#8C6D45] text-white shadow-md'
+                              : 'bg-white text-neutral-600 hover:bg-neutral-100 shadow-xs'
+                          }`}
+                        >
+                          <Users className="w-4 h-4 text-[#FAF7F0]" />
+                          <span>I am Couple</span>
                         </button>
                       </div>
-
-                      {hasPlusOne && (
-                        <div className="mt-3 pt-3 space-y-3">
-                          <div>
-                            <label className="block text-[11px] font-semibold uppercase text-neutral-700 mb-1">
-                              Plus-One Full Name <span className="text-[#8C6D45]">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={plusOneName}
-                              onChange={(e) => setPlusOneName(e.target.value)}
-                              placeholder="e.g. Clara Vance"
-                              className="w-full px-3.5 py-2.5 text-base sm:text-xs bg-white rounded-lg shadow-xs border-0 outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold uppercase text-neutral-700 mb-1">
-                              Plus-One Dietary Restrictions
-                            </label>
-                            <input
-                              type="text"
-                              value={plusOneDietary}
-                              onChange={(e) => setPlusOneDietary(e.target.value)}
-                              placeholder="e.g. Pescatarian, strictly vegan, nut allergy"
-                              className="w-full px-3.5 py-2.5 text-base sm:text-xs bg-white rounded-lg shadow-xs border-0 outline-none"
-                            />
-                          </div>
-                        </div>
-                      )}
+                      <p className="text-[11px] text-neutral-500 mt-2.5 italic">
+                        {attendanceType === 'single'
+                          ? 'Single Attendance · 1 seat reserved in your honour.'
+                          : 'Couple Attendance · 2 seats reserved in your honour.'}
+                      </p>
                     </div>
 
                     {/* Primary Guest Dietary Requirements */}

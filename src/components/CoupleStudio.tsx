@@ -64,6 +64,9 @@ export const CoupleStudio: React.FC<CoupleStudioProps> = ({
 
   // Pre-loaded photography options for couple
   const couplePhotoPresets = [
+    { label: 'Samson & Kevine (Official)', url: '/src/assets/images/IMG-20261107-WA0166.jpg' },
+    { label: 'Royal Devotion', url: '/src/assets/images/IMG-20261111-WA0068.jpg' },
+    { label: 'Cape Town Grace', url: '/src/assets/images/IMG-20261111-WA0069.jpg' },
     { label: 'Golden Hour Celebration', url: '/src/assets/images/IMG-20261107-WA0121.jpg' },
     { label: 'Eternal Romance', url: '/src/assets/images/IMG-20261107-WA0131.jpg' },
     { label: 'Timeless Union', url: '/src/assets/images/IMG-20261107-WA0132.jpg' },

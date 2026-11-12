@@ -187,7 +187,7 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
     const baseCx = r.left + 25 * em;
     const baseCy = r.top + 16.5 * em;
     const barH = 76;
-    const s = Math.min((window.innerWidth - 32) / cw, (window.innerHeight - barH - 28) / ch, 2.1);
+    const s = Math.min((window.innerWidth - 48) / cw, (window.innerHeight - barH - 40) / ch, 1.35);
     const tx = window.innerWidth / 2;
     const ty = (window.innerHeight - barH) / 2 + 6;
     const dx = tx - baseCx;
@@ -413,34 +413,34 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
         }
 
         .scene {
-          --w: min(calc(100vw - 32px), 640px, 78vh, 78dvh);
+          --w: min(calc(100vw - 32px), 380px, 52vh, 52dvh);
           font-size: calc(var(--w) / 50);
           position: relative;
           width: 50em;
-          height: 53em;
+          height: 48em;
           transition: opacity .35s ease;
         }
         .scene.fading { opacity: 0; }
         .scene.instant, .scene.instant * { transition: none !important; }
 
         .headline {
-          position: absolute; left: 0; right: 0; top: 3.5em;
+          position: absolute; left: 0; right: 0; top: 2.8em;
           text-align: center;
           transition: opacity .6s ease, transform .6s ease;
         }
         .headline .eyebrow {
-          margin: 0 0 .8em;
-          font: 500 1.4em/1.2 var(--body);
-          letter-spacing: .34em; text-transform: uppercase; color: var(--gold);
+          margin: 0 0 .6em;
+          font: 500 1.2em/1.2 var(--body);
+          letter-spacing: .3em; text-transform: uppercase; color: var(--gold);
         }
         .headline .script {
           margin: 0;
-          font: 400 6.6em/1 var(--script);
+          font: 400 5.2em/1 var(--script);
           color: var(--paper);
         }
         .is-opening .headline { opacity: 0; transform: translateY(-1.5em); }
 
-        .float { position: absolute; left: 0; top: 20em; width: 50em; height: 33em; perspective: 120em; }
+        .float { position: absolute; left: 0; top: 17em; width: 50em; height: 31em; perspective: 120em; }
         .tilt { position: absolute; inset: 0; perspective: 120em; will-change: transform; }
 
         .shadow {
@@ -488,7 +488,7 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
 
         .seal {
           position: absolute; left: 50%; top: 100%;
-          width: 8em; height: 8em; margin: -4em 0 0 -4em; padding: 0;
+          width: 7.2em; height: 7.2em; margin: -3.6em 0 0 -3.6em; padding: 0;
           border: 0; background: none; cursor: pointer;
           transform: translateZ(.25em);
           backface-visibility: hidden;
@@ -496,8 +496,8 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
           -webkit-tap-highlight-color: transparent;
         }
         .seal::after {
-          content: ""; position: absolute; inset: -.5em; border-radius: 50%;
-          border: 1px solid rgba(var(--gold-rgb), .8);
+          content: ""; position: absolute; inset: -.4em; border-radius: 50%;
+          background: radial-gradient(circle, rgba(var(--gold-rgb),.2) 0%, transparent 70%);
           animation: ring 2.4s ease-out infinite;
           pointer-events: none;
         }
@@ -514,17 +514,17 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
           position: absolute; inset: 0; border-radius: 50%;
           background: radial-gradient(circle at 34% 28%, var(--gold-hi), var(--gold) 46%, #8f6f33 100%);
           display: grid; place-items: center;
-          font: italic 600 2.5em/1 var(--display);
+          font: italic 600 2.2em/1 var(--display);
           color: #5b4216;
           text-shadow: 0 1px 0 rgba(255,244,205,.5);
         }
         .seal .disc::before {
-          content: ""; position: absolute; inset: .9em; border-radius: 50%;
-          border: 1px solid rgba(91,66,22,.55);
+          content: ""; position: absolute; inset: .8em; border-radius: 50%;
+          background: radial-gradient(circle, transparent 80%, rgba(91,66,22,.15) 100%);
         }
 
         .card {
-          position: absolute; left: 2em; top: 2em; width: 46em; height: 29em; z-index: 2;
+          position: absolute; left: 2em; top: 2em; width: 46em; height: 27em; z-index: 2;
           transform-origin: 50% 50%;
           cursor: pointer;
         }
@@ -539,21 +539,19 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
           background:
             repeating-linear-gradient(0deg, rgba(60,40,10,.014) 0 1px, transparent 1px 3px),
             radial-gradient(120% 95% at 28% 18%, var(--paper-hi), var(--paper));
-          box-shadow: 0 1.4em 3em rgba(0,0,0,.5), 0 .2em .6em rgba(0,0,0,.3);
+          box-shadow: 0 1.2em 2.6em rgba(0,0,0,.45), 0 .2em .5em rgba(0,0,0,.25);
           color: var(--ink);
         }
         .face.back-face { transform: rotateY(180deg); }
-        .face::before { content: ""; position: absolute; inset: 1.2em; border: 1px solid rgba(var(--gold-rgb), .85); pointer-events: none; }
-        .face::after { content: ""; position: absolute; inset: 1.7em; border: 1px solid rgba(var(--gold-rgb), .4); pointer-events: none; }
         .copy {
-          position: absolute; inset: 2.2em 2.8em;
+          position: absolute; inset: 1.8em 2.2em;
           display: flex; flex-direction: column; align-items: center; justify-content: center;
-          gap: .9em; text-align: center;
+          gap: .75em; text-align: center;
         }
-        .copy .eyebrow { margin: 0; font: 500 1.3em/1.3 var(--body); letter-spacing: .26em; text-transform: uppercase; color: var(--gold-ink); }
+        .copy .eyebrow { margin: 0; font: 500 1.15em/1.3 var(--body); letter-spacing: .24em; text-transform: uppercase; color: var(--gold-ink); }
         .names {
           margin: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 .3em;
-          font: italic 500 4.6em/1.05 var(--display);
+          font: italic 500 3.2em/1.05 var(--display);
           font-optical-sizing: auto;
           color: var(--ink);
         }
@@ -582,8 +580,8 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         {/* Couple photograph in the ground with soft depth of field */}
         <img
-          src="/src/assets/images/IMG-20261107-WA0181.jpg"
-          alt="Amanda & James"
+          src="/src/assets/images/IMG-20261107-WA0166.jpg"
+          alt="Samson & Kevine"
           className="w-full h-full object-cover object-center filter blur-xs scale-105 opacity-20 transition-transform duration-[14000ms] ease-out"
         />
         {/* Dark velvet room lighting */}
@@ -601,8 +599,8 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
       {/* Top Header: Audio Atmosphere & Minimal Navigation */}
       <header className="relative z-30 px-6 sm:px-10 py-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-[#c9a45c]/85">
-            Aurelia Bespoke Invitation
+          <span className="text-[11px] font-editorial uppercase tracking-[0.25em] text-[#ecd597] font-medium">
+            Samson &amp; Kevine
           </span>
         </div>
 
@@ -611,13 +609,13 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
             <button
               type="button"
               onClick={onToggleAudio}
-              className="px-2.5 py-1 rounded-xs bg-[#0b1714]/70 hover:bg-[#1b3a30] text-[#efe6d0] text-[10px] font-sans flex items-center gap-1.5 border border-[#c9a45c]/50 backdrop-blur-md transition-all"
-              title="Toggle Number One"
+              className="px-2.5 py-1 rounded-full bg-[#0b1714]/70 hover:bg-[#1b3a30] text-[#efe6d0] text-[10px] font-sans flex items-center gap-1.5 backdrop-blur-md transition-all cursor-pointer shadow-xs"
+              title="Toggle Jesus Christ Is the Best Teacher"
             >
               {isAudioPlaying ? (
                 <>
                   <Volume2 className="w-3 h-3 text-[#ecd597]" />
-                  <span className="hidden sm:inline tracking-wider uppercase text-[9px]">Number One</span>
+                  <span className="hidden sm:inline tracking-wider uppercase text-[9px]">Jesus Christ Is the Best Teacher</span>
                 </>
               ) : (
                 <>
@@ -631,7 +629,7 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
           <button
             type="button"
             onClick={handleEnterCelebration}
-            className="text-[10px] uppercase tracking-[0.22em] font-medium text-[#efe6d0]/75 hover:text-[#ecd597] px-2 py-1 transition-colors flex items-center gap-1"
+            className="text-[10px] uppercase tracking-[0.22em] font-medium text-[#efe6d0]/75 hover:text-[#ecd597] px-2 py-1 transition-colors flex items-center gap-1 cursor-pointer"
           >
             <span>Enter Site</span>
             <ArrowRight className="w-3 h-3" />
@@ -645,7 +643,7 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
           {/* Eyebrow & Script Title (fades on open) */}
           <div className="headline" aria-hidden="true">
             <p className="eyebrow">A letter for you</p>
-            <p className="script">You are invited</p>
+            <p className="script">Samson &amp; Kevine</p>
           </div>
 
           <div className="float">
@@ -668,11 +666,18 @@ export const OpeningInvitationExperience: React.FC<OpeningInvitationExperiencePr
                     {/* CARD FRONT FACE */}
                     <div className="face front-face">
                       <div className="copy">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden shadow-xs border border-[#c9a45c]/50 mb-0.5 shrink-0">
+                          <img
+                            src="/src/assets/images/IMG-20261107-WA0166.jpg"
+                            alt="Samson & Kevine"
+                            className="w-full h-full object-cover object-center"
+                          />
+                        </div>
                         <p className="eyebrow">Together with their families</p>
                         <h2 className="names">
-                          <span>{brideName}</span>
+                          <span>Samson</span>
                           <span className="amp">&amp;</span>
-                          <span>{groomName}</span>
+                          <span>Kevine</span>
                         </h2>
 
                         <p className="line">

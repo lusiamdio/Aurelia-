@@ -24,8 +24,9 @@ import {
   Trash2,
   Disc3,
   Printer,
-  Sliders,
-  Radio
+  Radio,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 interface CoupleDashboardProps {
@@ -50,7 +51,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const [dashboardTab, setDashboardTab] = useState<'guests' | 'playlist' | 'scanner' | 'privacy'>('guests');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
-    'all' | 'attending' | 'pending' | 'declined' | 'plus-one-pending' | 'plus-one-confirmed'
+    'all' | 'attending' | 'couple' | 'single' | 'pending' | 'declined'
   >('all');
   const [scannerInput, setScannerInput] = useState('');
   const [scanResult, setScanResult] = useState<{
@@ -61,8 +62,9 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const [showAddGuestModal, setShowAddGuestModal] = useState(false);
   const [newGuestName, setNewGuestName] = useState('');
   const [newGuestEmail, setNewGuestEmail] = useState('');
-  const [newGuestPlusOne, setNewGuestPlusOne] = useState(true);
-  const [newPlusOneName, setNewPlusOneName] = useState('');
+  const [newGuestPartyType, setNewGuestPartyType] = useState<'single' | 'couple'>('single');
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [geminiCsvReport, setGeminiCsvReport] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // DJ Celebration Playlist State (Starts completely empty)
@@ -89,26 +91,19 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const pendingGuests = guests.filter((g) => g.status === 'pending');
   const declinedGuests = guests.filter((g) => g.status === 'declined');
 
-  // Plus-Ones Breakdown
-  const guestsWithPlusOne = guests.filter((g) => g.hasPlusOne);
-  const confirmedPlusOnes = guests.filter(
-    (g) => g.hasPlusOne && g.plusOneStatus === 'confirmed' && g.status === 'attending'
-  );
-  const pendingPlusOnes = guests.filter(
-    (g) => g.hasPlusOne && (!g.plusOneStatus || g.plusOneStatus === 'pending') && g.status !== 'declined'
-  );
-  const rejectedPlusOnes = guests.filter(
-    (g) => g.hasPlusOne && g.plusOneStatus === 'rejected'
-  );
+  // Single vs Couple Breakdown
+  const coupleGuests = guests.filter((g) => g.attendanceType === 'couple' || g.hasPlusOne);
+  const singleGuests = guests.filter((g) => g.attendanceType !== 'couple' && !g.hasPlusOne);
 
-  // Total Confirmed Attendance Headcount: Primary Attending + Confirmed Plus-Ones
-  const totalConfirmedAttendees = attendingGuests.length + confirmedPlusOnes.length;
-  // Maximum potential headcount if all pending attend and get approved
-  const maxPotentialHeadcount =
-    attendingGuests.length +
-    pendingGuests.length +
-    confirmedPlusOnes.length +
-    pendingPlusOnes.length;
+  // Total Confirmed Attendance Headcount: 2 seats for couples, 1 seat for singles
+  const totalConfirmedAttendees = attendingGuests.reduce(
+    (acc, g) => acc + (g.attendanceType === 'couple' || g.hasPlusOne ? 2 : 1),
+    0
+  );
+  // Maximum potential headcount if all pending attend
+  const maxPotentialHeadcount = guests
+    .filter((g) => g.status !== 'declined')
+    .reduce((acc, g) => acc + (g.attendanceType === 'couple' || g.hasPlusOne ? 2 : 1), 0);
 
   const checkedInCount = guests.filter((g) => g.checkedIn).length;
 
@@ -116,46 +111,34 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const filteredGuests = guests.filter((g) => {
     const matchesSearch =
       g.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      g.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (g.plusOneName && g.plusOneName.toLowerCase().includes(searchTerm.toLowerCase()));
+      g.id.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
 
     if (filterStatus === 'all') return true;
     if (filterStatus === 'attending') return g.status === 'attending';
+    if (filterStatus === 'couple') return g.attendanceType === 'couple' || g.hasPlusOne;
+    if (filterStatus === 'single') return g.attendanceType !== 'couple' && !g.hasPlusOne;
     if (filterStatus === 'pending') return g.status === 'pending';
     if (filterStatus === 'declined') return g.status === 'declined';
-    if (filterStatus === 'plus-one-pending') {
-      return g.hasPlusOne && (!g.plusOneStatus || g.plusOneStatus === 'pending');
-    }
-    if (filterStatus === 'plus-one-confirmed') {
-      return g.hasPlusOne && g.plusOneStatus === 'confirmed';
-    }
     return true;
   });
 
-  // Handle Plus-One status confirmation or rejection
-  const handleUpdatePlusOneStatus = (
-    guestId: string,
-    newStatus: 'confirmed' | 'rejected' | 'pending'
-  ) => {
-    const targetGuest = guests.find((g) => g.id === guestId);
-    if (!targetGuest) return;
-
-    const updated = guests.map((g) =>
-      g.id === guestId ? { ...g, plusOneStatus: newStatus } : g
-    );
+  // Toggle guest between Single and Couple
+  const handleToggleAttendanceType = (guestId: string) => {
+    const updated = guests.map((g) => {
+      if (g.id !== guestId) return g;
+      const isNowCouple = !(g.attendanceType === 'couple' || g.hasPlusOne);
+      return {
+        ...g,
+        attendanceType: isNowCouple ? ('couple' as const) : ('single' as const),
+        hasPlusOne: isNowCouple,
+        plusOneStatus: isNowCouple ? ('confirmed' as const) : undefined
+      };
+    });
     onUpdateGuests(updated);
-
-    const actionText =
-      newStatus === 'confirmed'
-        ? `Confirmed plus-one (${targetGuest.plusOneName || 'Guest'}) for ${targetGuest.fullName}`
-        : newStatus === 'rejected'
-        ? `Declined plus-one for ${targetGuest.fullName}`
-        : `Reset plus-one to pending review for ${targetGuest.fullName}`;
-
-    setToastMessage(actionText);
-    setTimeout(() => setToastMessage(null), 3500);
+    setToastMessage('Updated guest attendance status (Single / Couple).');
+    setTimeout(() => setToastMessage(null), 2500);
   };
 
   // Door QR Code Validator
@@ -220,38 +203,76 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
     onUpdateGuests(updated);
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    setIsExportingCsv(true);
+    try {
+      const res = await fetch('/api/ai/export-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guests,
+          weddingTitle: `${wedding.partner1} & ${wedding.partner2}`
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.csvContent) {
+          const blob = new Blob([data.csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `${wedding.slug}_realtime_guest_roster.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          if (data.aiInsight) {
+            setGeminiCsvReport(data.aiInsight);
+            setToastMessage(`Real-Time CSV Export Complete! ${data.aiInsight}`);
+            setTimeout(() => setToastMessage(null), 5000);
+          }
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Real-time API export fallback:', err);
+    } finally {
+      setIsExportingCsv(false);
+    }
+
+    // Direct real-time CSV fallback
     const headers = [
       'Pass ID',
-      'Primary Guest Name',
+      'Guest Full Name',
+      'Attendance Type',
+      'Seats Reserved',
       'RSVP Status',
-      'Has Plus One',
-      'Plus One Name',
-      'Plus One Status',
-      'Plus One Dietary',
-      'Primary Dietary',
+      'Dietary Requirements',
       'Checked In',
       'Admission Time'
     ];
-    const rows = guests.map((g) => [
-      g.id,
-      `"${g.fullName}"`,
-      g.status,
-      g.hasPlusOne ? 'Yes' : 'No',
-      `"${g.plusOneName || ''}"`,
-      g.plusOneStatus || 'N/A',
-      `"${g.plusOneDietary || ''}"`,
-      `"${g.dietaryRequirements || ''}"`,
-      g.checkedIn ? 'Yes' : 'No',
-      g.checkedInAt || ''
-    ]);
+    const rows = guests.map((g) => {
+      const isCouple = g.attendanceType === 'couple' || g.hasPlusOne;
+      return [
+        g.id,
+        `"${g.fullName}"`,
+        isCouple ? 'Couple' : 'Single',
+        isCouple ? '2' : '1',
+        g.status,
+        `"${g.dietaryRequirements || ''}"`,
+        g.checkedIn ? 'Yes' : 'No',
+        g.checkedInAt || ''
+      ];
+    });
     const csvContent =
       'data:text/csv;charset=utf-8,' +
       [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${wedding.slug}_attendees_plus_ones.csv`);
+    link.setAttribute('download', `${wedding.slug}_realtime_guest_roster.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -384,16 +405,17 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const handleAddGuest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGuestName.trim()) return;
+    const isCouple = newGuestPartyType === 'couple';
     const newGuest: GuestInvitation = {
       id: `AUR-${Math.floor(1000 + Math.random() * 9000)}`,
       fullName: newGuestName.trim(),
       email: newGuestEmail.trim(),
       status: 'pending',
       eventsAttending: wedding.events.map((e) => e.id),
-      hasPlusOne: newGuestPlusOne,
-      plusOneName: newGuestPlusOne ? newPlusOneName.trim() || 'Accompanying Guest' : undefined,
-      plusOneStatus: newGuestPlusOne ? 'pending' : undefined,
-      plusOneAllowed: newGuestPlusOne,
+      attendanceType: newGuestPartyType,
+      hasPlusOne: isCouple,
+      plusOneStatus: isCouple ? 'confirmed' : undefined,
+      plusOneAllowed: isCouple,
       dietaryRequirements: '',
       invitationGeneratedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
       checkedIn: false
@@ -401,11 +423,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
     onUpdateGuests([newGuest, ...guests]);
     setNewGuestName('');
     setNewGuestEmail('');
-    setNewGuestPlusOne(true);
-    setNewPlusOneName('');
+    setNewGuestPartyType('single');
     setShowAddGuestModal(false);
 
-    setToastMessage(`Added ${newGuest.fullName} to guest registry.`);
+    setToastMessage(`Added ${newGuest.fullName} (${isCouple ? 'Couple · 2 Seats' : 'Single · 1 Seat'}) to guest registry.`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -413,11 +434,11 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
     <div className="min-h-screen bg-[#F3EDE2] text-[#292722] py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#B59A72]/20 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-8">
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[#FAF7F0] rounded-xs border border-[#B59A72]/30 text-[#292722] transition-colors"
+              className="p-2 hover:bg-[#FAF7F0] rounded-xl shadow-xs text-[#292722] transition-colors bg-white"
               title="Return to Homepage"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -427,7 +448,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                 Couple Concierge
               </span>
               <h1 className="font-editorial text-2xl sm:text-3xl font-normal">
-                Guest &amp; Plus-One Management
+                Guest &amp; Attendance Management
               </h1>
             </div>
           </div>
@@ -435,21 +456,26 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowAddGuestModal(true)}
-              className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-[#292722] hover:bg-[#8C6D45] rounded-xs transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-[#292722] hover:bg-[#8C6D45] rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Guest
             </button>
             <button
               onClick={handleExportCSV}
-              className="px-3.5 py-2 text-xs font-semibold uppercase tracking-wider bg-white border border-[#B59A72]/40 rounded-xs hover:bg-[#FAF7F0] transition-colors flex items-center gap-1.5"
+              disabled={isExportingCsv}
+              className="px-3.5 py-2 text-xs font-semibold uppercase tracking-wider bg-white shadow-xs rounded-xl hover:bg-[#FAF7F0] transition-colors flex items-center gap-1.5 text-[#292722]"
             >
-              <Download className="w-3.5 h-3.5 text-[#8C6D45]" />
-              Export CSV
+              {isExportingCsv ? (
+                <Loader2 className="w-3.5 h-3.5 text-[#8C6D45] animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-[#8C6D45]" />
+              )}
+              {isExportingCsv ? 'Exporting...' : 'Export CSV (Gemini AI)'}
             </button>
             <button
               onClick={onOpenStudio}
-              className="px-3.5 py-2 text-xs font-semibold uppercase tracking-wider bg-white border border-[#B59A72]/40 rounded-xs hover:bg-[#FAF7F0] transition-colors"
+              className="px-3.5 py-2 text-xs font-semibold uppercase tracking-wider bg-white shadow-xs rounded-xl hover:bg-[#FAF7F0] transition-colors text-[#292722]"
             >
               Invitation Designer
             </button>
@@ -458,42 +484,61 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
 
         {/* Global Toast Notification */}
         {toastMessage && (
-          <div className="mb-6 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xs flex items-center gap-2">
+          <div className="mb-6 p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl shadow-xs flex items-center gap-2">
             <Check className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{toastMessage}</span>
           </div>
         )}
 
+        {/* Real-time Gemini CSV Insight Banner */}
+        {geminiCsvReport && (
+          <div className="mb-6 p-4 bg-white rounded-2xl shadow-sm text-xs text-[#292722] flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-[#8C6D45] shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-semibold text-[#8C6D45] uppercase tracking-wider text-[11px] block mb-0.5">
+                Gemini Real-Time Headcount Intelligence
+              </span>
+              <p className="text-neutral-700 leading-relaxed whitespace-pre-line">{geminiCsvReport}</p>
+            </div>
+            <button
+              onClick={() => setGeminiCsvReport(null)}
+              className="text-neutral-400 hover:text-neutral-700 text-xs font-mono"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Primary View Switcher Navigation Tabs */}
-        <div className="flex items-center gap-3 sm:gap-6 border-b border-[#B59A72]/20 mb-8 overflow-x-auto text-xs uppercase tracking-wider font-semibold">
+        <div className="flex items-center gap-2 p-1.5 bg-[#FAF7F0] rounded-2xl shadow-xs mb-8 overflow-x-auto text-xs uppercase tracking-wider font-semibold">
           <button
             onClick={() => setDashboardTab('guests')}
-            className={`pb-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
               dashboardTab === 'guests'
-                ? 'border-[#8C6D45] text-[#8C6D45]'
-                : 'border-transparent text-neutral-500 hover:text-[#292722]'
+                ? 'bg-[#292722] text-white shadow-xs'
+                : 'text-neutral-600 hover:text-[#292722]'
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Guest RSVPs &amp; Plus-Ones ({totalGuests})</span>
+            <span>Guest Roster &amp; Seats ({totalGuests})</span>
           </button>
           <button
             onClick={() => setDashboardTab('playlist')}
-            className={`pb-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
               dashboardTab === 'playlist'
-                ? 'border-[#8C6D45] text-[#8C6D45]'
-                : 'border-transparent text-neutral-500 hover:text-[#292722]'
+                ? 'bg-[#292722] text-white shadow-xs'
+                : 'text-neutral-600 hover:text-[#292722]'
             }`}
           >
             <Music className="w-4 h-4 text-[#8C6D45]" />
-            <span>DJ Celebration Playlist ({songList.length})</span>
+            <span>Celebration Playlist ({songList.length})</span>
           </button>
           <button
             onClick={() => setDashboardTab('scanner')}
-            className={`pb-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
               dashboardTab === 'scanner'
-                ? 'border-[#8C6D45] text-[#8C6D45]'
-                : 'border-transparent text-neutral-500 hover:text-[#292722]'
+                ? 'bg-[#292722] text-white shadow-xs'
+                : 'text-neutral-600 hover:text-[#292722]'
             }`}
           >
             <ScanLine className="w-4 h-4" />
@@ -501,10 +546,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
           </button>
           <button
             onClick={() => setDashboardTab('privacy')}
-            className={`pb-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all whitespace-nowrap ${
               dashboardTab === 'privacy'
-                ? 'border-rose-700 text-rose-700'
-                : 'border-transparent text-neutral-500 hover:text-rose-700'
+                ? 'bg-rose-700 text-white shadow-xs'
+                : 'text-neutral-600 hover:text-rose-700'
             }`}
           >
             <Trash2 className="w-4 h-4" />
@@ -516,80 +561,86 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
         {dashboardTab === 'guests' && (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          {/* Card 1: Total Confirmed Attendees (Headcount) */}
-          <div className="bg-[#FAF7F0] p-4 rounded-sm border-2 border-[#8C6D45]/40 shadow-xs relative overflow-hidden">
-            <div className="flex items-center justify-between text-xs text-neutral-600 mb-1">
-              <span className="font-semibold text-[#8C6D45] uppercase tracking-wider text-[11px]">
-                Total Confirmed Seats
-              </span>
-              <UserCheck className="w-4 h-4 text-[#8C6D45]" />
-            </div>
-            <div className="font-editorial text-3xl sm:text-4xl font-normal text-[#292722] tabular-nums">
-              {totalConfirmedAttendees}
-            </div>
-            <p className="text-[11px] text-[#5A554E] mt-1">
-              <span className="font-medium text-[#292722]">{attendingGuests.length}</span> primary +{' '}
-              <span className="font-medium text-emerald-700">{confirmedPlusOnes.length}</span> confirmed +1s
-            </p>
-          </div>
+              {/* Card 1: Total Confirmed Seats */}
+              <div className="bg-[#FAF7F0] p-4 rounded-xl shadow-xs relative overflow-hidden">
+                <div className="flex items-center justify-between text-xs text-neutral-600 mb-1">
+                  <span className="font-semibold text-[#8C6D45] uppercase tracking-wider text-[11px]">
+                    Total Confirmed Seats
+                  </span>
+                  <UserCheck className="w-4 h-4 text-[#8C6D45]" />
+                </div>
+                <div className="font-editorial text-3xl sm:text-4xl font-normal text-[#292722] tabular-nums">
+                  {totalConfirmedAttendees}
+                </div>
+                <p className="text-[11px] text-[#5A554E] mt-1">
+                  <span className="font-medium text-[#292722]">
+                    {coupleGuests.filter((g) => g.status === 'attending').length}
+                  </span>{' '}
+                  couples (2 seats) +{' '}
+                  <span className="font-medium text-emerald-700">
+                    {singleGuests.filter((g) => g.status === 'attending').length}
+                  </span>{' '}
+                  singles
+                </p>
+              </div>
 
-          {/* Card 2: Primary Confirmed RSVPs */}
-          <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30">
-            <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
-              <span>Primary Guests RSVP</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="font-editorial text-2xl sm:text-3xl font-normal text-emerald-800 tabular-nums">
-              {attendingGuests.length} / {totalGuests}
-            </div>
-            <span className="text-[10px] text-neutral-500">
-              {pendingGuests.length} awaiting response
-            </span>
-          </div>
+              {/* Card 2: Couples Confirmed */}
+              <div className="bg-[#FAF7F0] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
+                  <span>Couples (2 Seats)</span>
+                  <Users className="w-4 h-4 text-[#8C6D45]" />
+                </div>
+                <div className="font-editorial text-2xl sm:text-3xl font-normal text-[#292722] tabular-nums">
+                  {coupleGuests.filter((g) => g.status === 'attending').length}
+                </div>
+                <span className="text-[10px] text-neutral-500">
+                  {coupleGuests.length} total registered couples
+                </span>
+              </div>
 
-          {/* Card 3: Plus-One Review Queue */}
-          <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30">
-            <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
-              <span>Plus-One Requests</span>
-              <UserPlus className="w-4 h-4 text-[#8C6D45]" />
-            </div>
-            <div className="font-editorial text-2xl sm:text-3xl font-normal text-[#292722] tabular-nums">
-              {guestsWithPlusOne.length}
-            </div>
-            <p className="text-[10px] text-neutral-600 mt-1">
-              <span className="text-emerald-700 font-medium">{confirmedPlusOnes.length} Confirmed</span> ·{' '}
-              <span className="text-amber-700 font-medium">{pendingPlusOnes.length} Pending</span> ·{' '}
-              <span className="text-rose-700 font-medium">{rejectedPlusOnes.length} Declined</span>
-            </p>
-          </div>
+              {/* Card 3: Singles Confirmed */}
+              <div className="bg-[#FAF7F0] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
+                  <span>Singles (1 Seat)</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="font-editorial text-2xl sm:text-3xl font-normal text-emerald-800 tabular-nums">
+                  {singleGuests.filter((g) => g.status === 'attending').length}
+                </div>
+                <span className="text-[10px] text-neutral-500">
+                  {singleGuests.length} total registered singles
+                </span>
+              </div>
 
-          {/* Card 4: Potential Headcount Ceiling */}
-          <div className="bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30">
-            <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
-              <span>Potential Max Guests</span>
-              <Users className="w-4 h-4 text-neutral-400" />
-            </div>
-            <div className="font-editorial text-2xl sm:text-3xl font-normal text-neutral-700 tabular-nums">
-              {maxPotentialHeadcount}
-            </div>
-            <span className="text-[10px] text-neutral-500">If all pending attend</span>
-          </div>
+              {/* Card 4: Potential Headcount Ceiling */}
+              <div className="bg-[#FAF7F0] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
+                  <span>Potential Max Seats</span>
+                  <Users className="w-4 h-4 text-neutral-400" />
+                </div>
+                <div className="font-editorial text-2xl sm:text-3xl font-normal text-neutral-700 tabular-nums">
+                  {maxPotentialHeadcount}
+                </div>
+                <span className="text-[10px] text-neutral-500">
+                  {pendingGuests.length} awaiting response
+                </span>
+              </div>
 
-          {/* Card 5: Venue Door Check-In Scanned */}
-          <div className="col-span-2 lg:col-span-1 bg-[#FAF7F0] p-4 rounded-sm border border-[#B59A72]/30">
-            <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
-              <span>Door Checked-In</span>
-              <ShieldCheck className="w-4 h-4 text-[#8C6D45]" />
+              {/* Card 5: Venue Door Check-In Scanned */}
+              <div className="col-span-2 lg:col-span-1 bg-[#FAF7F0] p-4 rounded-xl shadow-xs">
+                <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
+                  <span>Door Checked-In</span>
+                  <ShieldCheck className="w-4 h-4 text-[#8C6D45]" />
+                </div>
+                <div className="font-editorial text-2xl sm:text-3xl font-normal text-[#292722] tabular-nums">
+                  {checkedInCount} / {totalConfirmedAttendees}
+                </div>
+                <span className="text-[10px] text-neutral-500">Entrance passes verified</span>
+              </div>
             </div>
-            <div className="font-editorial text-2xl sm:text-3xl font-normal text-[#292722] tabular-nums">
-              {checkedInCount} / {totalConfirmedAttendees}
-            </div>
-            <span className="text-[10px] text-neutral-500">Entrance passes verified</span>
-          </div>
-        </div>
 
         {/* 2. QR Code Entrance Pass Scanner */}
-        <div className="bg-[#FAF7F0] p-5 sm:p-6 rounded-sm border border-[#B59A72]/40 shadow-xs mb-8">
+        <div className="bg-[#FAF7F0] p-5 sm:p-6 rounded-2xl shadow-sm mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#8C6D45]">
@@ -610,12 +661,12 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                   if (e.key === 'Enter') handleVerifyPass(scannerInput);
                 }}
                 placeholder="Enter Pass ID (e.g. AUR-8012)"
-                className="flex-1 px-3.5 py-2 text-xs bg-white border border-[#B59A72]/40 rounded-xs uppercase font-mono text-[#292722] focus:outline-hidden focus:border-[#8C6D45]"
+                className="flex-1 px-3.5 py-2 text-xs bg-white rounded-lg uppercase font-mono text-[#292722] focus:outline-hidden shadow-xs"
               />
               <button
                 type="button"
                 onClick={() => handleVerifyPass(scannerInput)}
-                className="px-4 py-2 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors whitespace-nowrap"
+                className="px-4 py-2 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors whitespace-nowrap shadow-xs"
               >
                 Validate Pass
               </button>
@@ -625,10 +676,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
           {/* Scanner Result Banner */}
           {scanResult && (
             <div
-              className={`mt-4 p-3 rounded-xs text-xs flex items-center justify-between gap-2 border ${
+              className={`mt-4 p-3 rounded-lg text-xs flex items-center justify-between gap-2 shadow-xs ${
                 scanResult.success
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : 'bg-rose-50 border-rose-200 text-rose-800'
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : 'bg-rose-50 text-rose-800'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -658,25 +709,25 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search guest or plus-one name, pass ID..."
-              className="w-full pl-9 pr-3.5 py-2 text-xs bg-white border border-[#B59A72]/30 rounded-xs text-[#292722] focus:outline-hidden focus:border-[#8C6D45]"
+              placeholder="Search guest name, pass ID..."
+              className="w-full pl-9 pr-3.5 py-2 text-xs bg-white rounded-lg text-[#292722] focus:outline-hidden shadow-xs"
             />
           </div>
 
           {/* Filter segment tabs */}
-          <div className="flex items-center gap-1 p-1 bg-[#FAF7F0] rounded-xs border border-[#B59A72]/20 text-xs overflow-x-auto">
+          <div className="flex items-center gap-1.5 p-1.5 bg-[#FAF7F0] rounded-xl shadow-xs text-xs overflow-x-auto">
             {[
-              { id: 'all', label: 'All Guests' },
-              { id: 'attending', label: 'Attending' },
-              { id: 'plus-one-pending', label: `+1 Review (${pendingPlusOnes.length})` },
-              { id: 'plus-one-confirmed', label: `+1 Confirmed (${confirmedPlusOnes.length})` },
-              { id: 'pending', label: 'RSVP Pending' },
-              { id: 'declined', label: 'Declined' }
+              { id: 'all', label: `All Guests (${guests.length})` },
+              { id: 'attending', label: `Attending (${attendingGuests.length})` },
+              { id: 'couple', label: `Couples (${coupleGuests.length})` },
+              { id: 'single', label: `Singles (${singleGuests.length})` },
+              { id: 'pending', label: `RSVP Pending (${pendingGuests.length})` },
+              { id: 'declined', label: `Declined (${declinedGuests.length})` }
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setFilterStatus(tab.id as typeof filterStatus)}
-                className={`px-3 py-1.5 rounded-xs transition-colors whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap text-xs ${
                   filterStatus === tab.id
                     ? 'bg-[#292722] text-white font-medium shadow-xs'
                     : 'text-neutral-600 hover:text-[#292722]'
@@ -688,27 +739,27 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
           </div>
         </div>
 
-        {/* 4. Guest Roster Table with Dedicated Plus-One Controls */}
-        <div className="bg-[#FAF7F0] rounded-sm border border-[#B59A72]/30 overflow-hidden shadow-xs">
+        {/* 4. Guest Roster Table with Single / Couple Switcher */}
+        <div className="bg-[#FAF7F0] rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#EFEAE2] border-b border-[#B59A72]/20 text-[11px] uppercase tracking-wider text-neutral-600">
+              <thead className="bg-[#EFEAE2] text-[11px] uppercase tracking-wider text-neutral-600">
                 <tr>
                   <th className="py-3 px-4 font-semibold">Pass ID</th>
                   <th className="py-3 px-4 font-semibold">Primary Guest</th>
-                  <th className="py-3 px-4 font-semibold">RSVP Decision</th>
-                  <th className="py-3 px-4 font-semibold">Plus-One Details</th>
-                  <th className="py-3 px-4 font-semibold">Plus-One Host Action</th>
+                  <th className="py-3 px-4 font-semibold">RSVP Status</th>
+                  <th className="py-3 px-4 font-semibold">Party Switcher</th>
+                  <th className="py-3 px-4 font-semibold">Seats</th>
                   <th className="py-3 px-4 font-semibold">Check-In</th>
-                  <th className="py-3 px-4 font-semibold text-right">Share</th>
+                  <th className="py-3 px-4 font-semibold text-right">Share Pass</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#B59A72]/15">
+              <tbody>
                 {filteredGuests.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-16 text-center text-neutral-500">
                       <div className="max-w-md mx-auto space-y-2">
-                        <div className="w-12 h-12 rounded-full bg-[#FAF7F0] border border-[#B59A72]/30 flex items-center justify-center mx-auto text-[#8C6D45]">
+                        <div className="w-12 h-12 rounded-full bg-[#FAF7F0] shadow-xs flex items-center justify-center mx-auto text-[#8C6D45]">
                           <Users className="w-6 h-6" />
                         </div>
                         <p className="font-editorial text-lg text-[#292722] font-normal">
@@ -716,7 +767,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                         </p>
                         <p className="text-xs text-neutral-500 leading-relaxed">
                           {guests.length === 0
-                            ? 'The guest roster and invitation requests are completely empty. When guests RSVP on the microsite or generate an entrance pass, their records and plus-ones will automatically appear here.'
+                            ? 'The guest roster is currently empty. Guests can RSVP directly on the microsite choosing "I am Single" or "I am Couple", or you can add them below.'
                             : 'Try adjusting or clearing your search term and RSVP status filters above.'}
                         </p>
                         {guests.length === 0 && (
@@ -724,10 +775,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                             <button
                               type="button"
                               onClick={() => setShowAddGuestModal(true)}
-                              className="px-4 py-2 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors inline-flex items-center gap-1.5"
+                              className="px-4 py-2 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-xs"
                             >
                               <Plus className="w-3.5 h-3.5" />
-                              <span>Add First Guest Manually</span>
+                              <span>Add First Guest</span>
                             </button>
                           </div>
                         )}
@@ -735,12 +786,17 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  filteredGuests.map((guest) => {
-                    const hasP1 = guest.hasPlusOne;
-                    const p1Status = guest.plusOneStatus || (hasP1 ? 'pending' : undefined);
+                  filteredGuests.map((guest, idx) => {
+                    const isCouple = guest.attendanceType === 'couple' || guest.hasPlusOne;
+                    const seats = isCouple ? 2 : 1;
 
                     return (
-                      <tr key={guest.id} className="hover:bg-white/60 transition-colors">
+                      <tr
+                        key={guest.id}
+                        className={`transition-colors ${
+                          idx % 2 === 0 ? 'bg-transparent' : 'bg-black/[0.015]'
+                        } hover:bg-white/80`}
+                      >
                         {/* Pass ID */}
                         <td className="py-3.5 px-4 font-mono font-semibold text-[#8C6D45]">
                           {guest.id}
@@ -771,12 +827,12 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                                 e.target.value as 'attending' | 'pending' | 'declined'
                               )
                             }
-                            className={`text-xs py-1 px-2 rounded-xs border font-medium uppercase tracking-wider ${
+                            className={`text-xs py-1 px-2.5 rounded-lg font-medium uppercase tracking-wider shadow-xs focus:outline-hidden ${
                               guest.status === 'attending'
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                ? 'bg-emerald-50 text-emerald-800'
                                 : guest.status === 'pending'
-                                ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                : 'bg-rose-50 text-rose-800 border-rose-300'
+                                ? 'bg-amber-50 text-amber-800'
+                                : 'bg-rose-50 text-rose-800'
                             }`}
                           >
                             <option value="attending">Attending</option>
@@ -785,87 +841,34 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                           </select>
                         </td>
 
-                        {/* Plus-One Details */}
+                        {/* Attendance Switcher (I am Single / I am Couple) */}
                         <td className="py-3.5 px-4">
-                          {hasP1 ? (
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-medium text-[#292722]">
-                                  +1 {guest.plusOneName || 'Guest Requested'}
-                                </span>
-                              </div>
-                              {guest.plusOneDietary && (
-                                <span className="text-[10px] text-neutral-500 block mt-0.5">
-                                  Dietary: {guest.plusOneDietary}
-                                </span>
-                              )}
-                              {/* Status badge */}
-                              <div className="mt-1">
-                                {p1Status === 'confirmed' && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-xs border border-emerald-200">
-                                    <Check className="w-2.5 h-2.5" />
-                                    Confirmed Seat
-                                  </span>
-                                )}
-                                {p1Status === 'rejected' && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-xs border border-rose-200">
-                                    <X className="w-2.5 h-2.5" />
-                                    Declined / Single Only
-                                  </span>
-                                )}
-                                {p1Status === 'pending' && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-xs border border-amber-200">
-                                    <Clock className="w-2.5 h-2.5" />
-                                    Awaiting Couple Approval
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-neutral-400 text-xs">No plus-one</span>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAttendanceType(guest.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs flex items-center gap-1.5 ${
+                              isCouple
+                                ? 'bg-[#292722] text-[#F3EDE2] hover:bg-[#8C6D45]'
+                                : 'bg-white text-neutral-700 hover:bg-[#FAF7F0]'
+                            }`}
+                            title="Click to switch attendance between Single and Couple"
+                          >
+                            <Users className="w-3.5 h-3.5 opacity-80" />
+                            <span>{isCouple ? 'I am Couple' : 'I am Single'}</span>
+                          </button>
                         </td>
 
-                        {/* Plus-One Host Action Controls (Confirm / Reject) */}
+                        {/* Reserved Seats Count */}
                         <td className="py-3.5 px-4">
-                          {hasP1 ? (
-                            <div className="flex items-center gap-1.5">
-                              {p1Status !== 'confirmed' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdatePlusOneStatus(guest.id, 'confirmed')}
-                                  className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xs transition-colors flex items-center gap-1 shadow-xs"
-                                  title="Approve / Confirm this plus-one"
-                                >
-                                  <Check className="w-3 h-3" />
-                                  Confirm
-                                </button>
-                              )}
-                              {p1Status !== 'rejected' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdatePlusOneStatus(guest.id, 'rejected')}
-                                  className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 rounded-xs transition-colors flex items-center gap-1"
-                                  title="Decline this plus-one"
-                                >
-                                  <X className="w-3 h-3" />
-                                  Decline
-                                </button>
-                              )}
-                              {p1Status !== 'pending' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdatePlusOneStatus(guest.id, 'pending')}
-                                  className="p-1 text-neutral-400 hover:text-neutral-700 text-[10px]"
-                                  title="Reset to pending review"
-                                >
-                                  <HelpCircle className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-neutral-400 text-[11px]">—</span>
-                          )}
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                              isCouple
+                                ? 'bg-[#8C6D45]/15 text-[#8C6D45]'
+                                : 'bg-neutral-200/60 text-neutral-700'
+                            }`}
+                          >
+                            {seats} {seats === 2 ? 'Seats (Couple)' : 'Seat (Single)'}
+                          </span>
                         </td>
 
                         {/* Door Check-In Status */}
@@ -873,10 +876,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                           <button
                             type="button"
                             onClick={() => handleToggleCheckIn(guest.id)}
-                            className={`px-2.5 py-1 text-[11px] font-medium rounded-xs border transition-colors flex items-center gap-1 ${
+                            className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors flex items-center gap-1 shadow-xs ${
                               guest.checkedIn
-                                ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-                                : 'bg-white border-neutral-300 text-neutral-600 hover:border-[#8C6D45]'
+                                ? 'bg-emerald-100 text-emerald-900'
+                                : 'bg-white text-neutral-600 hover:bg-neutral-50 hover:text-[#8C6D45]'
                             }`}
                           >
                             {guest.checkedIn ? (
@@ -895,16 +898,13 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                           <button
                             onClick={() => {
                               const url = `https://${wedding.customDomain || 'aurelia.invites'}/pass/${guest.id}`;
-                              const p1Note =
-                                guest.hasPlusOne && guest.plusOneStatus === 'confirmed'
-                                  ? ` (Includes confirmed seat for +1: ${guest.plusOneName || 'Guest'})`
-                                  : '';
+                              const attendanceNote = isCouple ? ' (Couple Admission · 2 Seats Reserved)' : ' (Single Admission · 1 Seat)';
                               const text = encodeURIComponent(
-                                `Dear ${guest.fullName},\nYour wedding invitation pass for Sarah & James is ready${p1Note}:\n${url}`
+                                `Dear ${guest.fullName},\nYour wedding invitation pass for ${wedding.partner1} & ${wedding.partner2} is ready${attendanceNote}:\n${url}`
                               );
                               window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
                             }}
-                            className="p-1.5 text-neutral-600 hover:text-emerald-700 hover:bg-white rounded-xs transition-colors"
+                            className="p-1.5 text-neutral-600 hover:text-emerald-700 hover:bg-white rounded-lg transition-colors shadow-xs"
                             title="Share via WhatsApp"
                           >
                             <Share2 className="w-3.5 h-3.5" />
@@ -1482,7 +1482,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
         )}
         {showAddGuestModal && (
           <div className="fixed inset-0 z-50 bg-[#292722]/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-[#FAF7F0] rounded-sm max-w-md w-full border border-[#B59A72]/40 shadow-2xl p-6 relative">
+            <div className="bg-[#FAF7F0] rounded-2xl max-w-md w-full shadow-2xl p-6 relative">
               <button
                 onClick={() => setShowAddGuestModal(false)}
                 className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-900 font-mono text-sm"
@@ -1491,16 +1491,16 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
               </button>
 
               <h3 className="font-editorial text-2xl font-normal text-[#292722] mb-1">
-                Add Invited Guest &amp; Plus-One
+                Add Guest to Registry
               </h3>
               <p className="text-xs text-neutral-600 mb-4">
-                Register a new guest in the couple concierge with plus-one accommodation controls.
+                Register a new guest in the couple concierge with Single or Couple party selection.
               </p>
 
               <form onSubmit={handleAddGuest} className="space-y-4 text-xs">
                 <div>
                   <label className="block font-semibold uppercase tracking-wider text-[#292722] mb-1">
-                    Primary Guest Full Name <span className="text-[#8C6D45]">*</span>
+                    Guest Full Name <span className="text-[#8C6D45]">*</span>
                   </label>
                   <input
                     type="text"
@@ -1508,7 +1508,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                     value={newGuestName}
                     onChange={(e) => setNewGuestName(e.target.value)}
                     placeholder="e.g. Lord Henry Sinclair"
-                    className="w-full px-3 py-2 text-sm bg-white border border-[#B59A72]/40 rounded-xs"
+                    className="w-full px-3.5 py-2 text-sm bg-white rounded-lg shadow-xs focus:outline-hidden"
                   />
                 </div>
 
@@ -1521,52 +1521,52 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                     value={newGuestEmail}
                     onChange={(e) => setNewGuestEmail(e.target.value)}
                     placeholder="guest@example.com"
-                    className="w-full px-3 py-2 text-sm bg-white border border-[#B59A72]/40 rounded-xs"
+                    className="w-full px-3.5 py-2 text-sm bg-white rounded-lg shadow-xs focus:outline-hidden"
                   />
                 </div>
 
-                {/* Plus-One Allocation */}
-                <div className="p-3 bg-white rounded-xs border border-[#B59A72]/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-[#292722]">
-                      Allow Accompanying Plus-One (+1)
-                    </span>
-                    <input
-                      type="checkbox"
-                      id="newPlusOneCheck"
-                      checked={newGuestPlusOne}
-                      onChange={(e) => setNewGuestPlusOne(e.target.checked)}
-                      className="accent-[#8C6D45]"
-                    />
+                {/* Single / Couple Switcher */}
+                <div className="p-3.5 bg-white rounded-xl shadow-xs space-y-2">
+                  <label className="block font-semibold uppercase tracking-wider text-[#292722] text-[11px]">
+                    Attendance Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewGuestPartyType('single')}
+                      className={`py-2 px-3 text-xs rounded-lg font-medium transition-all ${
+                        newGuestPartyType === 'single'
+                          ? 'bg-[#292722] text-white shadow-xs'
+                          : 'bg-[#FAF7F0] text-neutral-600 hover:bg-[#FAF7F0]/80'
+                      }`}
+                    >
+                      I am Single (1 Seat)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewGuestPartyType('couple')}
+                      className={`py-2 px-3 text-xs rounded-lg font-medium transition-all ${
+                        newGuestPartyType === 'couple'
+                          ? 'bg-[#292722] text-white shadow-xs'
+                          : 'bg-[#FAF7F0] text-neutral-600 hover:bg-[#FAF7F0]/80'
+                      }`}
+                    >
+                      I am Couple (2 Seats)
+                    </button>
                   </div>
-
-                  {newGuestPlusOne && (
-                    <div className="pt-2 border-t border-neutral-100">
-                      <label className="block text-[11px] text-neutral-600 mb-1">
-                        Expected Plus-One Name (if known)
-                      </label>
-                      <input
-                        type="text"
-                        value={newPlusOneName}
-                        onChange={(e) => setNewPlusOneName(e.target.value)}
-                        placeholder="e.g. Lady Beatrice Sinclair"
-                        className="w-full px-3 py-1.5 text-xs bg-[#FAF7F0] border border-neutral-300 rounded-xs"
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <div className="pt-2 flex gap-3">
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors shadow-sm"
+                    className="flex-1 py-2.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors shadow-sm"
                   >
                     Save &amp; Generate ID
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAddGuestModal(false)}
-                    className="px-4 py-2.5 border border-[#B59A72]/40 text-[#292722] rounded-xs hover:bg-[#292722]/5"
+                    className="px-4 py-2.5 bg-white text-[#292722] rounded-lg hover:bg-neutral-100 shadow-xs"
                   >
                     Cancel
                   </button>

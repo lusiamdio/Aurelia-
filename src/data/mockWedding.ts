@@ -20,11 +20,11 @@ export const INITIAL_WEDDING: WeddingData = {
     'Your presence means so much to us on this very special day!',
     'With all our love and our most sincere gratitude.'
   ],
-  dressCodeSummary: 'Church Ceremony: Vintage Wear · Dinning Ceremony: Gala Wear',
+  dressCodeSummary: 'Palette: Olive Green, Peach, Black, Beige · Church Ceremony: Vintage Wear · Dinning Ceremony: Gala Wear',
   dressCodeChurch: 'Vintage Wear',
   dressCodeDining: 'Gala Wear',
-  scripture1: 'Therefore what God has joined together, let no one separate. — Mark 10:9',
-  scripture2: 'I will restore to you the years that the swarming locust has eaten. — Joel 2:25',
+  scripture1: 'Therefore what God has joined together, let no one separate.',
+  scripture2: 'I will restore to you the years that the swarming locust has eaten.',
   heroImage: '/src/assets/images/IMG-20261107-WA0121.jpg',
   invitationStyle: 'classic',
   foilAccent: 'gold',
@@ -37,7 +37,7 @@ export const INITIAL_WEDDING: WeddingData = {
   // Visual Customization & Design options
   cardOrientation: 'portrait',
   selectedFontFamily: 'cormorant',
-  couplePhotoUrl: '/src/assets/images/IMG-20261107-WA0131.jpg',
+  couplePhotoUrl: '/src/assets/images/IMG-20261107-WA0166.jpg',
   showPhotoOnCard: true,
   photoFrameStyle: 'arch',
   decorativeGraphic: 'botanical',
@@ -74,7 +74,7 @@ export const INITIAL_WEDDING: WeddingData = {
       image: '/src/assets/images/IMG-20261107-WA0132.jpg'
     },
     {
-      year: 'Mark 10:9',
+      year: 'Sacred Union',
       title: 'United in Holy Matrimony',
       location: 'Lion Voice Tabernacle',
       description: 'Therefore what God has joined together, let no one separate. With all our love and our most sincere gratitude.',
@@ -91,7 +91,7 @@ export const INITIAL_WEDDING: WeddingData = {
       venue: 'Lion Voice Tabernacle',
       address: '11 Lower Maynard Rd Wynberg Station, Tailan Building Basement Hall.',
       dressCode: 'Vintage Wear',
-      description: 'Therefore what God has joined together, let no one separate. — Mark 10:9'
+      description: 'Therefore what God has joined together, let no one separate.'
     },
     {
       id: 'evt-reception',
@@ -101,7 +101,7 @@ export const INITIAL_WEDDING: WeddingData = {
       venue: 'Rooftop',
       address: '39 Salt River Road, Salt River, Cape Town, Western Cape, 7405',
       dressCode: 'Gala Wear',
-      description: 'I will restore to you the years that the swarming locust has eaten. — Joel 2:25'
+      description: 'I will restore to you the years that the swarming locust has eaten.'
     }
   ]
 };

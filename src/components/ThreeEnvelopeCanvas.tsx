@@ -441,7 +441,7 @@ export const ThreeEnvelopeCanvas: React.FC<ThreeEnvelopeCanvasProps> = ({
 
     // Load couple photo for card
     const texLoader = new THREE.TextureLoader();
-    const cardTex = texLoader.load('/src/assets/images/IMG-20261107-WA0181.jpg');
+    const cardTex = texLoader.load('/src/assets/images/IMG-20261107-WA0166.jpg');
     cardTex.colorSpace = THREE.SRGBColorSpace;
 
     const cardMat = new THREE.MeshPhysicalMaterial({

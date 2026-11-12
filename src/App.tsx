@@ -202,23 +202,25 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F3EDE2] text-[#292722] flex flex-col font-sans-ui selection:bg-[#B59A72]/20">
-      {/* Top Navbar */}
-      <Navbar
-        currentView={currentView}
-        onNavigate={handleNavigate}
-        onOpenCreate={() => handleNavigate('studio')}
-        isCoupleAdmin={isCoupleAdmin}
-        onOpenCoupleLogin={() => {
-          setPendingTargetView('studio');
-          setShowAuthModal(true);
-        }}
-        onLogoutAdmin={handleLogoutAdmin}
-        partnerNames={partnerFirstNames}
-      />
+      {/* Top Navbar — Hidden on Wedding Microsite */}
+      {currentView !== 'microsite' && (
+        <Navbar
+          currentView={currentView}
+          onNavigate={handleNavigate}
+          onOpenCreate={() => handleNavigate('studio')}
+          isCoupleAdmin={isCoupleAdmin}
+          onOpenCoupleLogin={() => {
+            setPendingTargetView('studio');
+            setShowAuthModal(true);
+          }}
+          onLogoutAdmin={handleLogoutAdmin}
+          partnerNames={partnerFirstNames}
+        />
+      )}
 
       {/* Global Status Banner / Notification */}
       {globalNotification && (
-        <div className="bg-[#1C1B18] text-[#FAF7F0] px-4 py-2 text-xs border-b border-[#D4AF37]/30 flex items-center justify-center gap-2">
+        <div className="bg-[#1C1B18] text-[#FAF7F0] px-4 py-2 text-xs flex items-center justify-center gap-2 shadow-md">
           <Check className="w-3.5 h-3.5 text-[#D4AF37]" />
           <span>{globalNotification}</span>
         </div>
@@ -232,6 +234,13 @@ export default function App() {
             wedding={wedding}
             onBackToApp={() => setCurrentView('landing')}
             onGuestRegistered={handleGuestRegistered}
+            isCoupleAdmin={isCoupleAdmin}
+            onOpenCoupleLogin={() => {
+              setPendingTargetView('dashboard');
+              setShowAuthModal(true);
+            }}
+            onOpenDashboard={() => handleNavigate('dashboard')}
+            onLogoutAdmin={handleLogoutAdmin}
             onSongRequested={(song) => {
               setWedding((prev) => ({
                 ...prev,

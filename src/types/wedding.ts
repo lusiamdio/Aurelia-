@@ -102,6 +102,7 @@ export interface GuestInvitation {
   phone?: string;
   status: 'attending' | 'declined' | 'pending';
   eventsAttending: string[];
+  attendanceType?: 'single' | 'couple';
   hasPlusOne: boolean;
   plusOneName?: string;
   plusOneDietary?: string;
