@@ -85,6 +85,9 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Single Guest Deletion State
+  const [guestToDelete, setGuestToDelete] = useState<GuestInvitation | null>(null);
+
   // Compute analytics
   const totalGuests = guests.length;
   const attendingGuests = guests.filter((g) => g.status === 'attending');
@@ -201,6 +204,18 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
         : g
     );
     onUpdateGuests(updated);
+  };
+
+  const handleConfirmDeleteGuest = () => {
+    if (!guestToDelete) return;
+    const updated = guests.filter((g) => g.id !== guestToDelete.id);
+    onUpdateGuests(updated);
+    if (scanResult?.guest?.id === guestToDelete.id) {
+      setScanResult(null);
+    }
+    setToastMessage(`Removed "${guestToDelete.fullName}" (${guestToDelete.id}) from the booking list.`);
+    setTimeout(() => setToastMessage(null), 3500);
+    setGuestToDelete(null);
   };
 
   const handleExportCSV = async () => {
@@ -751,7 +766,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                   <th className="py-3 px-4 font-semibold">Party Switcher</th>
                   <th className="py-3 px-4 font-semibold">Seats</th>
                   <th className="py-3 px-4 font-semibold">Check-In</th>
-                  <th className="py-3 px-4 font-semibold text-right">Share Pass</th>
+                  <th className="py-3 px-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -893,22 +908,34 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                           </button>
                         </td>
 
-                        {/* WhatsApp / Pass Share */}
+                        {/* WhatsApp / Pass Share & Admin Delete Guest */}
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => {
-                              const url = `https://${wedding.customDomain || 'aurelia.invites'}/pass/${guest.id}`;
-                              const attendanceNote = isCouple ? ' (Couple Admission · 2 Seats Reserved)' : ' (Single Admission · 1 Seat)';
-                              const text = encodeURIComponent(
-                                `Dear ${guest.fullName},\nYour wedding invitation pass for ${wedding.partner1} & ${wedding.partner2} is ready${attendanceNote}:\n${url}`
-                              );
-                              window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-                            }}
-                            className="p-1.5 text-neutral-600 hover:text-emerald-700 hover:bg-white rounded-lg transition-colors shadow-xs"
-                            title="Share via WhatsApp"
-                          >
-                            <Share2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const url = `https://${wedding.customDomain || 'aurelia.invites'}/pass/${guest.id}`;
+                                const attendanceNote = isCouple ? ' (Couple Admission · 2 Seats Reserved)' : ' (Single Admission · 1 Seat)';
+                                const text = encodeURIComponent(
+                                  `Dear ${guest.fullName},\nYour wedding invitation pass for ${wedding.partner1} & ${wedding.partner2} is ready${attendanceNote}:\n${url}`
+                                );
+                                window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                              }}
+                              className="p-1.5 text-neutral-600 hover:text-emerald-700 hover:bg-white rounded-lg transition-colors shadow-xs"
+                              title="Share via WhatsApp"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGuestToDelete(guest)}
+                              className="p-1.5 text-neutral-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors shadow-xs"
+                              title="Delete guest from booking list"
+                              aria-label={`Delete ${guest.fullName}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1572,6 +1599,54 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+        {/* Confirm Single Guest Deletion Modal */}
+        {guestToDelete && (
+          <div className="fixed inset-0 z-50 bg-[#292722]/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#FAF7F0] rounded-2xl max-w-md w-full shadow-2xl p-6 relative">
+              <button
+                type="button"
+                onClick={() => setGuestToDelete(null)}
+                className="absolute top-4 right-4 text-neutral-500 hover:text-neutral-900 font-mono text-sm"
+              >
+                ✕
+              </button>
+
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="w-5 h-5" />
+              </div>
+
+              <h3 className="font-editorial text-2xl font-normal text-[#292722] text-center mb-1">
+                Remove Guest from Booking List?
+              </h3>
+              <p className="text-xs text-neutral-600 text-center mb-5 leading-relaxed">
+                This will permanently remove{' '}
+                <span className="font-semibold text-[#292722]">{guestToDelete.fullName}</span>{' '}
+                (<span className="font-mono text-[#8C6D45]">{guestToDelete.id}</span> ·{' '}
+                {guestToDelete.attendanceType === 'couple' || guestToDelete.hasPlusOne
+                  ? 'Couple · 2 Seats'
+                  : 'Single · 1 Seat'}
+                ) from your wedding booking list and recalculate confirmed seats.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteGuest}
+                  className="flex-1 py-2.5 bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold uppercase tracking-wider rounded-lg transition-colors shadow-sm"
+                >
+                  Delete Guest
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGuestToDelete(null)}
+                  className="px-4 py-2.5 bg-white text-[#292722] text-xs font-semibold rounded-lg hover:bg-neutral-100 shadow-xs"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}
