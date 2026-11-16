@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 
@@ -20,6 +21,46 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 app.use(express.json());
+
+// Server-side Couple Admin Auth (matches database/schema.sql authenticate_couple_admin workflow)
+const ADMIN_PIN_HASH = crypto.createHash('sha256').update(process.env.COUPLE_ADMIN_PIN || '2026').digest();
+
+app.post('/api/auth/login', (req, res) => {
+  const { credential, passcode, partner1, partner2 } = req.body || {};
+  const inputClean = String(credential || '').trim().toLowerCase();
+  const p1Clean = String(partner1 || 'Samson').split(' ')[0].toLowerCase();
+  const p2Clean = String(partner2 || 'Kevine').split(' ')[0].toLowerCase();
+
+  const matchesCoupleNames =
+    (inputClean.includes(p1Clean) && inputClean.includes(p2Clean)) ||
+    inputClean === `${p1Clean} & ${p2Clean}` ||
+    inputClean === `${p1Clean} and ${p2Clean}`;
+
+  if (!matchesCoupleNames) {
+    return res.status(401).json({
+      authenticated: false,
+      error: 'Invalid couple credential. Please enter both partner first names.'
+    });
+  }
+
+  const submittedHash = crypto.createHash('sha256').update(String(passcode || '').trim()).digest();
+  const validPin = crypto.timingSafeEqual(submittedHash, ADMIN_PIN_HASH);
+
+  if (!validPin) {
+    return res.status(401).json({
+      authenticated: false,
+      error: 'Invalid PIN passcode. Please enter the valid administrative PIN.'
+    });
+  }
+
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  return res.status(200).json({
+    authenticated: true,
+    role: 'couple_admin',
+    sessionToken,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  });
+});
 
 // Initialize GoogleGenAI server-side with User-Agent header
 const apiKey = process.env.GEMINI_API_KEY;

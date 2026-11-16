@@ -159,237 +159,279 @@ function generateQrMatrix(value: string): boolean[][] {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function parseDatePartsForPdf(rawDate?: string) {
+  const fallback = { weekday: 'SUNDAY', day: '20', month: 'DECEMBER', year: '2026' };
+  if (!rawDate) return fallback;
+  const parts = rawDate.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return fallback;
+  const [y, m, d] = parts;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const weekdays = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  const months = [
+    'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+  ];
+  return {
+    weekday: weekdays[dt.getUTCDay()] || fallback.weekday,
+    day: String(d),
+    month: months[dt.getUTCMonth()] || fallback.month,
+    year: String(y)
+  };
+}
+
 /**
- * 1. GENERATE & DOWNLOAD CEREMONY INVITATION CARD (LANDSCAPE)
- * Uses Gemini API to craft bespoke real-time blessing and proclamation
+ * Renders the 1:1 Black & Gold Wedding E-Invite onto the current 148x148mm jsPDF page
+ */
+function renderBlackGoldEInvitePdfPage(
+  doc: jsPDF,
+  {
+    wedding,
+    guestName,
+    hasPlusOne = false
+  }: {
+    wedding: WeddingData;
+    guestName: string;
+    hasPlusOne?: boolean;
+  }
+) {
+  const S = 148 / 1092; // exact mm scale from 1092x1092 canvas
+  const px = (v: number) => v * S;
+  const size = 148;
+  const cx = px(546);
+
+  // 1. Background #050505
+  doc.setFillColor(5, 5, 5);
+  doc.rect(0, 0, size, size, 'F');
+
+  // Subtle dark slate bokeh ellipses (pre-blended on #050505 for universal PDF viewer compatibility)
+  const bokehDots = [
+    { x: 240, y: 220, r: 82, rgb: [16, 20, 25] },
+    { x: 860, y: 410, r: 90, rgb: [15, 19, 24] },
+    { x: 290, y: 790, r: 72, rgb: [16, 20, 25] },
+    { x: 770, y: 870, r: 66, rgb: [18, 21, 26] }
+  ];
+  bokehDots.forEach((b) => {
+    doc.setFillColor(b.rgb[0], b.rgb[1], b.rgb[2]);
+    doc.circle(px(b.x), px(b.y), px(b.r), 'F');
+    doc.setFillColor(b.rgb[0] + 5, b.rgb[1] + 5, b.rgb[2] + 6);
+    doc.circle(px(b.x), px(b.y), px(b.r * 0.58), 'F');
+  });
+
+  // Gold Dust Clusters TR & BL (#C9983A)
+  const dustPts = [
+    // TR cluster
+    [810, 52, 2.2], [845, 38, 1.4], [882, 76, 3.0], [915, 48, 1.8], [952, 92, 2.6],
+    [988, 62, 3.2], [1022, 44, 2.0], [1054, 84, 2.8], [834, 112, 1.6], [874, 136, 2.4],
+    [912, 120, 1.2], [944, 156, 2.9], [982, 132, 1.9], [1018, 118, 2.6], [1048, 162, 1.5],
+    [896, 184, 2.0], [938, 204, 1.5], [974, 188, 2.8], [1012, 214, 2.2], [1062, 206, 3.0],
+    [960, 248, 1.8], [1002, 266, 2.4], [1038, 288, 1.6], [1070, 256, 2.1], [1016, 320, 1.4],
+    // BL cluster
+    [42, 768, 2.0], [78, 794, 2.8], [118, 822, 1.6], [34, 836, 2.5], [68, 868, 1.4],
+    [104, 882, 3.0], [146, 860, 1.9], [188, 898, 2.3], [52, 918, 3.1], [88, 946, 1.8],
+    [128, 932, 2.6], [168, 958, 1.5], [214, 942, 2.3], [36, 986, 2.6], [74, 1012, 2.1],
+    [114, 996, 3.2], [158, 1024, 1.8], [198, 1004, 2.8], [242, 1036, 1.7], [48, 1054, 2.5],
+    [92, 1064, 1.4], [138, 1060, 2.8], [224, 1068, 2.0], [268, 1052, 1.3]
+  ];
+  doc.setFillColor(201, 152, 58); // #C9983A
+  dustPts.forEach(([x, y, r]) => {
+    doc.circle(px(x), px(y), px(r * 1.35), 'F');
+  });
+
+  // 2. Botanical Line-Art Florals (#E6B94A)
+  doc.setDrawColor(230, 185, 74); // #E6B94A
+  doc.setLineWidth(0.28);
+
+  // Top-Left Botanical Stem & Blossoms
+  doc.lines([[px(65), px(60), px(105), px(150), px(98), px(265)]], px(-20), px(30), [1, 1], 'S');
+  doc.lines([[px(60), px(65), px(112), px(135), px(138), px(230)]], px(24), px(-15), [1, 1], 'S');
+  doc.lines([[px(55), px(-15), px(115), px(15), px(155), px(70)]], px(78), px(240), [1, 1], 'S');
+  doc.circle(px(150), px(118), px(44), 'S');
+  doc.circle(px(150), px(118), px(24), 'S');
+  doc.circle(px(195), px(82), px(34), 'S');
+  doc.circle(px(74), px(222), px(32), 'S');
+  doc.ellipse(px(212), px(230), px(42), px(14), 'S');
+  doc.ellipse(px(118), px(332), px(38), px(13), 'S');
+
+  // Bottom-Right Botanical Stem & Blossoms (compact so it clears Registry link)
+  doc.lines([[px(-45), px(-55), px(-80), px(-135), px(-78), px(-225)]], px(1086), px(1065), [1, 1], 'S');
+  doc.circle(px(974), px(934), px(36), 'S');
+  doc.circle(px(974), px(934), px(18), 'S');
+  doc.ellipse(px(960), px(848), px(32), px(11), 'S');
+  doc.ellipse(px(995), px(1002), px(34), px(11), 'S');
+
+  // 3. Header Circle Outline (centered at 546, 174, r=162) & Upper-Left Sprig
+  doc.setDrawColor(230, 185, 74);
+  doc.setLineWidth(0.28);
+  doc.circle(cx, px(174), px(162), 'S');
+
+  // Upper-Left Sprig along circle edge
+  doc.lines([[px(-32), px(34), px(-48), px(83), px(-42), px(134)]], px(430), px(52), [1, 1], 'S');
+  doc.ellipse(px(392), px(83), px(15), px(6), 'S');
+  doc.ellipse(px(376), px(120), px(16), px(6), 'S');
+  doc.ellipse(px(372), px(158), px(14), px(6), 'S');
+  doc.setFillColor(230, 185, 74);
+  doc.circle(px(433), px(49), px(3), 'F');
+
+  // 4. Text Hierarchy Inside Circle (x = 546 — Groom and Bride names only)
+  const p1First = (wedding.partner1 || 'Samson').trim().split(' ')[0];
+  const p2First = (wedding.partner2 || 'Kevine').trim().split(' ')[0];
+
+  // Couple Names centered vertically inside circle (cy = 174) in #D8AE4E (Gold Primary)
+  doc.setTextColor(216, 174, 78);
+  doc.setFont('times', 'italic');
+  doc.setFontSize(23.5);
+  doc.text(p1First, cx, px(124), { align: 'center' });
+  doc.setFontSize(25.5);
+  doc.text('&', cx, px(182), { align: 'center' });
+  doc.setFontSize(23.5);
+  doc.text(p2First, cx, px(240), { align: 'center' });
+
+  // 5. Guest Block (Dynamic Couple vs Single — no "Guest(s):" label)
+  const displayGuest = (guestName || 'Honoured Guest').trim();
+  const partyVariant = hasPlusOne ? '(Couple)' : '(Single)';
+
+  // Measure guest + tag for balanced inline centering
+  doc.setFont('times', 'normal');
+  doc.setFontSize(10.8);
+  const nameStr = `${displayGuest} `;
+  const tagStr = partyVariant;
+  const totalW = doc.getTextWidth(nameStr + tagStr);
+  const startX = cx - totalW / 2;
+
+  doc.setTextColor(216, 174, 78);
+  doc.text(nameStr, startX, px(408));
+  doc.setTextColor(255, 255, 255);
+  doc.text(tagStr, startX + doc.getTextWidth(nameStr), px(408));
+
+  // White Divider (490px wide centered)
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.28);
+  doc.line(px(301), px(452), px(791), px(452));
+
+  // 6. Invitation Message (3 lines)
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(8.2);
+  const msgLines = [
+    'Together with our families, we joyfully invite you',
+    'to celebrate our sacred union in love, grace,',
+    'and eternal fellowship in Cape Town.'
+  ];
+  doc.text(msgLines, cx, px(500), { align: 'center', lineHeightFactor: 1.4 });
+
+  // 7. 3-Column Date Block
+  const { weekday, day, month, year } = parseDatePartsForPdf(wedding.rawDate);
+
+  // Col L: Weekday
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.22);
+  doc.line(px(230), px(640), px(395), px(640));
+  doc.line(px(230), px(726), px(395), px(726));
+  doc.setFont('times', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(weekday, px(312.5), px(692), { align: 'center' });
+
+  // Col C: Big Day + Year
+  doc.setTextColor(216, 174, 78);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(32);
+  doc.text(day, cx, px(712), { align: 'center' });
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8.5);
+  doc.text(year, cx, px(772), { align: 'center' });
+
+  // Col R: Month
+  doc.line(px(697), px(640), px(862), px(640));
+  doc.line(px(697), px(726), px(862), px(726));
+  doc.text(month, px(779.5), px(692), { align: 'center' });
+
+  // 8. Horizontal Schedule Row
+  const ev1 = wedding.events?.[0] || { title: 'Wedding Benediction', time: '13:00' };
+  const ev2 = wedding.events?.[1] || { title: 'Evening Reception', time: '18:00 - 21:00' };
+
+  doc.setFontSize(7.8);
+  const seg1Label = `${ev1.title}: `;
+  const seg1Val = `${ev1.time}      `;
+  const seg2Label = `${ev2.title}: `;
+  const seg2Val = `${ev2.time}`;
+  const schedTotalW = doc.getTextWidth(seg1Label + seg1Val + seg2Label + seg2Val);
+  let sx = cx - schedTotalW / 2;
+
+  doc.setTextColor(216, 174, 78);
+  doc.text(seg1Label, sx, px(836));
+  sx += doc.getTextWidth(seg1Label);
+  doc.setTextColor(255, 255, 255);
+  doc.text(seg1Val, sx, px(836));
+  sx += doc.getTextWidth(seg1Val);
+  doc.setTextColor(216, 174, 78);
+  doc.text(seg2Label, sx, px(836));
+  sx += doc.getTextWidth(seg2Label);
+  doc.setTextColor(255, 255, 255);
+  doc.text(seg2Val, sx, px(836));
+
+  // 9. Notice (High-Contrast Red #FF4D55)
+  doc.setTextColor(255, 77, 85); // #FF4D55
+  doc.setFont('times', 'bold');
+  doc.setFontSize(9.2);
+  doc.text('ADULTS ONLY', cx, px(894), { align: 'center' });
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(6.6);
+  doc.text(
+    'Kindly note: young children aged 0 to 5 years only for evening event.',
+    cx,
+    px(928),
+    { align: 'center' }
+  );
+
+  // 10. Venue Text
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(10.2);
+  doc.text(
+    wedding.venue || 'Lion Voice Tabernacle & Rooftop, 39 Salt River Rd',
+    cx,
+    px(1002),
+    { align: 'center' }
+  );
+}
+
+/**
+ * 1. GENERATE & DOWNLOAD BLACK & GOLD WEDDING E-INVITE (1:1 SQUARE)
  */
 export async function downloadCeremonyCardPDF({
   wedding,
   guestName,
-  guestId = 'AUR-8012',
   hasPlusOne = false,
-  plusOneName = '',
   onStatusUpdate
 }: CardPdfOptions): Promise<void> {
   onStatusUpdate?.('Initializing vector canvas');
-  await sleep(400);
+  await sleep(300);
 
   onStatusUpdate?.('Rendering bespoke calligraphy & photo');
-  const [geminiData, photoDataUrl] = await Promise.all([
-    fetchGeminiPdfContent('card', {
-      guestName,
-      guestId,
-      hasPlusOne,
-      plusOneName,
-      coupleNames: `${wedding.partner1} & ${wedding.partner2}`,
-      venue: wedding.venue,
-      date: wedding.rawDate,
-      dressCode: wedding.dressCodeSummary
-    }),
-    loadImageDataUrl(wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg')
-  ]);
-  await sleep(350);
+  await sleep(300);
 
   onStatusUpdate?.('Generating high-density QR gate pass');
-  await sleep(400);
+  await sleep(250);
 
-  // Create A5 Landscape document: 210mm x 148mm
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: 'portrait',
     unit: 'mm',
-    format: [210, 148]
+    format: [148, 148]
   });
 
-  const width = 210;
-  const height = 148;
-
-  // Custom colors or luxurious ivory
-  const isCustom = wedding.customColors?.isCustom;
-  const isMidnight = !isCustom && wedding.paperTone === 'midnight';
-
-  if (isMidnight) {
-    doc.setFillColor(28, 27, 24); // #1C1B18
-  } else {
-    doc.setFillColor(250, 247, 240); // Champagne Ivory #FAF7F0
-  }
-  doc.rect(0, 0, width, height, 'F');
-
-  // Double Gold Border
-  // Outer border
-  doc.setDrawColor(181, 154, 114); // #B59A72
-  doc.setLineWidth(1.0);
-  doc.rect(8, 8, width - 16, height - 16);
-
-  // Inner hairline gold border
-  doc.setDrawColor(212, 175, 55); // #D4AF37
-  doc.setLineWidth(0.35);
-  doc.rect(11, 11, width - 22, height - 22);
-
-  // Corner decorative flourishes
-  const drawCornerFlourish = (x: number, y: number, dirX: number, dirY: number) => {
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.4);
-    doc.line(x, y, x + dirX * 6, y);
-    doc.line(x, y, x, y + dirY * 6);
-    doc.setFillColor(212, 175, 55);
-    doc.circle(x + dirX * 2.5, y + dirY * 2.5, 0.7, 'F');
-  };
-  drawCornerFlourish(13, 13, 1, 1);
-  drawCornerFlourish(width - 13, 13, -1, 1);
-  drawCornerFlourish(13, height - 13, 1, -1);
-  drawCornerFlourish(width - 13, height - 13, -1, -1);
-
-  // Text Colors
-  const textColor = isMidnight ? [250, 247, 240] : [41, 39, 34];
-  const goldColor = [181, 154, 114];
-  const dimColor = isMidnight ? [200, 195, 185] : [115, 110, 102];
-
-  // Header Motif
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'normal');
-  doc.setFontSize(10);
-  doc.text('✦  ·  S & K  ·  ✦', width / 2, 19, { align: 'center' });
-
-  // Top invitation line
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.setFontSize(8);
-  doc.text('C E L E B R A T I O N   O F   L O V E', width / 2, 24, { align: 'center' });
-
-  // Couple Names (Hero typography)
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(22);
-  doc.text(`${wedding.partner1}  &  ${wedding.partner2}`, width / 2, 34, { align: 'center' });
-
-  // Holy Matrimony Scripture
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(8.5);
-  doc.text('“Therefore what God has joined together, let no one separate.”', width / 2, 40, { align: 'center' });
-
-  // Request pleasure line
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.setFont('times', 'normal');
-  doc.setFontSize(8);
-  doc.text('request the pleasure of your company at their sacred marriage celebration', width / 2, 45, { align: 'center' });
-
-  // Honoured Guest Badge & Gemini Personalized Blessing with Couple Photo
-  const photoW = 26;
-  const photoH = 32;
-  const guestBoxY = photoDataUrl ? 46 : 49;
-  const guestBoxHeight = photoDataUrl ? photoH : 27;
-
-  if (photoDataUrl) {
-    const photoX = 18;
-    doc.setFillColor(245, 238, 221);
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.4);
-    doc.rect(photoX - 1, guestBoxY - 1, photoW + 2, photoH + 2, 'FD');
-
-    try {
-      doc.addImage(photoDataUrl, 'JPEG', photoX, guestBoxY, photoW, photoH);
-    } catch {
-      doc.setFillColor(212, 175, 55);
-      doc.circle(photoX + photoW / 2, guestBoxY + photoH / 2, 10, 'F');
-    }
-
-    // Guest Dedication Box on right side of photo
-    const boxX = photoX + photoW + 5;
-    const boxW = width - boxX - 18;
-    doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.3);
-    doc.rect(boxX, guestBoxY, boxW, photoH, 'FD');
-
-    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-    doc.setFont('times', 'bold');
-    doc.setFontSize(8);
-    const guestLine = hasPlusOne && plusOneName
-      ? `HONOURED GUEST: ${guestName.toUpperCase()}  &  ${plusOneName.toUpperCase()} (+1)`
-      : `HONOURED GUEST: ${guestName.toUpperCase()}`;
-    doc.text(guestLine, boxX + boxW / 2, guestBoxY + 6, { align: 'center' });
-
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.setFont('times', 'italic');
-    doc.setFontSize(8);
-    const splitBlessing = doc.splitTextToSize(`“${geminiData.blessing}”`, boxW - 8);
-    doc.text(splitBlessing, boxX + boxW / 2, guestBoxY + 13, { align: 'center' });
-
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-    doc.text(`Official Guest Pass Ref: ${guestId}  ·  Verified Ceremony Credential`, boxX + boxW / 2, guestBoxY + photoH - 4, { align: 'center' });
-  } else {
-    doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.3);
-    doc.rect(24, guestBoxY, width - 48, guestBoxHeight, 'FD');
-
-    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-    doc.setFont('times', 'bold');
-    doc.setFontSize(8);
-    const guestLine = hasPlusOne && plusOneName
-      ? `HONOURED GUEST: ${guestName.toUpperCase()}  &  ${plusOneName.toUpperCase()} (+1)`
-      : `HONOURED GUEST: ${guestName.toUpperCase()}`;
-    doc.text(guestLine, width / 2, guestBoxY + 5.5, { align: 'center' });
-
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.setFont('times', 'italic');
-    doc.setFontSize(8);
-    const splitBlessing = doc.splitTextToSize(`“${geminiData.blessing}”`, width - 58);
-    doc.text(splitBlessing, width / 2, guestBoxY + 11.5, { align: 'center' });
-  }
-
-  // Wedding Date & Agenda Details
-  const detailsY = guestBoxY + guestBoxHeight + 6;
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(10);
-  const displayDate = (wedding.date || wedding.rawDate).toUpperCase();
-  doc.text(displayDate, width / 2, detailsY, { align: 'center' });
-
-  // Agenda Event 1: Wedding Benediction
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(8);
-  doc.text('WEDDING BENEDICTION · 13:00 · LION VOICE TABERNACLE', width / 2, detailsY + 5, { align: 'center' });
-  doc.setFont('times', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.text('11 Lower Maynard Rd Wynberg Station, Tailan Building Basement Hall', width / 2, detailsY + 8.5, { align: 'center' });
-
-  // Agenda Event 2: Evening Reception
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(8);
-  doc.text('EVENING RECEPTION · 18:00 TO 21:00 · ROOFTOP', width / 2, detailsY + 13.5, { align: 'center' });
-  doc.setFont('times', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.text('39 Salt River Road, Salt River, Cape Town, Western Cape, 7405', width / 2, detailsY + 17, { align: 'center' });
-
-  // Dress Code & Joel 2:25 Scripture
-  const footerY = detailsY + 23;
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(7);
-  doc.text('DRESS CODE: CHURCH CEREMONY: VINTAGE WEAR  ·  DINNING CEREMONY: GALA WEAR', width / 2, footerY, { align: 'center' });
-
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(7.5);
-  doc.text('“I will restore to you the years that the swarming locust has eaten.”', width / 2, footerY + 4.5, { align: 'center' });
-
-  // Micro print watermark
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(6);
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.text(`AURELIA BESPOKE SUITE  ·  PASS REF: ${guestId}  ·  AI CURATED`, width / 2, height - 13, { align: 'center' });
+  renderBlackGoldEInvitePdfPage(doc, {
+    wedding,
+    guestName,
+    hasPlusOne
+  });
 
   onStatusUpdate?.('Packaging print-ready typography and finishing touches');
-  await sleep(400);
+  await sleep(300);
 
-  const filename = `Ceremony-Invitation-Card-${guestName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  const filename = `Samson-Kevine-Black-Gold-E-Invite-${guestName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   doc.save(filename);
 }
 
@@ -666,29 +708,14 @@ export async function downloadUnifiedInvitationPDF({
   guestId = 'AUR-8012',
   hasPlusOne = false,
   plusOneName = '',
-  plusOneStatus = 'confirmed',
-  plusOneDietary = '',
-  dietaryRequirements = '',
-  selectedEventIds = ['evt-2', 'evt-3'],
   onStatusUpdate
 }: UnifiedInvitationPdfOptions): Promise<void> {
   onStatusUpdate?.('Initializing vector canvas');
   await sleep(350);
 
   onStatusUpdate?.('Rendering bespoke calligraphy & photo');
-  // Fetch real-time Gemini copy for both front (blessing) and back (gate protocol)
   const coupleNames = `${wedding.partner1} & ${wedding.partner2}`;
-  const [cardGemini, passGemini, photoDataUrl] = await Promise.all([
-    fetchGeminiPdfContent('card', {
-      guestName,
-      guestId,
-      hasPlusOne,
-      plusOneName,
-      coupleNames,
-      venue: wedding.venue,
-      date: wedding.rawDate,
-      dressCode: wedding.dressCodeSummary
-    }),
+  const [passGemini, photoDataUrl] = await Promise.all([
     fetchGeminiPdfContent('pass', {
       guestName,
       guestId,
@@ -705,209 +732,28 @@ export async function downloadUnifiedInvitationPDF({
   onStatusUpdate?.('Generating high-density QR gate pass');
   await sleep(350);
 
-  // Create unified A5 Landscape document: 210mm x 148mm
+  // Page 1: Square 148x148mm Black & Gold Wedding E-Invite (Front)
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: 'portrait',
     unit: 'mm',
-    format: [210, 148]
+    format: [148, 148]
   });
 
+  /* ========================================================
+   * PAGE 1: FRONT — BLACK & GOLD 1:1 WEDDING E-INVITE
+   * ======================================================== */
+  renderBlackGoldEInvitePdfPage(doc, {
+    wedding,
+    guestName,
+    hasPlusOne
+  });
+
+  /* ========================================================
+   * PAGE 2: BACK — QR DIGITAL VENUE PASS & COUPLE PORTRAIT
+   * ======================================================== */
   const width = 210;
   const height = 148;
-
-  // Custom colors or luxurious ivory
-  const isCustom = wedding.customColors?.isCustom;
-  const isMidnight = !isCustom && wedding.paperTone === 'midnight';
-  const textColor = isMidnight ? [250, 247, 240] : [41, 39, 34];
-  const goldColor = [181, 154, 114];
-  const dimColor = isMidnight ? [200, 195, 185] : [115, 110, 102];
-
-  // Helper for ornate corner flourishes
-  const drawCornerFlourish = (x: number, y: number, dirX: number, dirY: number) => {
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.4);
-    doc.line(x, y, x + dirX * 6, y);
-    doc.line(x, y, x, y + dirY * 6);
-    doc.setFillColor(212, 175, 55);
-    doc.circle(x + dirX * 2.5, y + dirY * 2.5, 0.7, 'F');
-  };
-
-  /* ========================================================
-   * PAGE 1: FRONT — LUXURY CEREMONY INVITATION CARD
-   * ======================================================== */
-  if (isMidnight) {
-    doc.setFillColor(28, 27, 24); // #1C1B18
-  } else {
-    doc.setFillColor(250, 247, 240); // Champagne Ivory #FAF7F0
-  }
-  doc.rect(0, 0, width, height, 'F');
-
-  // Outer border
-  doc.setDrawColor(181, 154, 114);
-  doc.setLineWidth(0.9);
-  doc.rect(7, 7, width - 14, height - 14);
-
-  // Inner hairline gold border
-  doc.setDrawColor(212, 175, 55);
-  doc.setLineWidth(0.3);
-  doc.rect(9.5, 9.5, width - 19, height - 19);
-
-  // Flourishes
-  drawCornerFlourish(11.5, 11.5, 1, 1);
-  drawCornerFlourish(width - 11.5, 11.5, -1, 1);
-  drawCornerFlourish(11.5, height - 11.5, 1, -1);
-  drawCornerFlourish(width - 11.5, height - 11.5, -1, -1);
-
-  // Header Motif
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'normal');
-  doc.setFontSize(9);
-  doc.text('✦  ·  SAMSON & KEVINE  ·  ✦', width / 2, 16.5, { align: 'center' });
-
-  // Celebration Line
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.setFontSize(7.5);
-  doc.text('C E L E B R A T I O N   O F   S A C R E D   U N I O N', width / 2, 21.5, { align: 'center' });
-
-  // Hero Couple Names
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(20);
-  doc.text(`${wedding.partner1}  &  ${wedding.partner2}`, width / 2, 30.5, { align: 'center' });
-
-  // Holy Matrimony Scripture
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(8.5);
-  doc.text('“Therefore what God has joined together, let no one separate.”', width / 2, 36, { align: 'center' });
-
-  // Request line
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.setFont('times', 'normal');
-  doc.setFontSize(7.5);
-  doc.text('request the pleasure of your company at their sacred marriage celebration', width / 2, 40.5, { align: 'center' });
-
-  // Photo + Honoured Guest Section Layout
-  const photoW = 28;
-  const photoH = 34;
-  const contentY = 44;
-
-  if (photoDataUrl) {
-    // Embed photo on left side of guest dedication box
-    const photoX = 17;
-    doc.setFillColor(245, 238, 221);
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.4);
-    doc.rect(photoX - 1, contentY - 1, photoW + 2, photoH + 2, 'FD');
-
-    try {
-      doc.addImage(photoDataUrl, 'JPEG', photoX, contentY, photoW, photoH);
-    } catch {
-      // Fallback placeholder if image load fails
-      doc.setFillColor(212, 175, 55);
-      doc.circle(photoX + photoW / 2, contentY + photoH / 2, 10, 'F');
-    }
-
-    // Guest Dedication Box on right side
-    const boxX = photoX + photoW + 5;
-    const boxW = width - boxX - 17;
-    doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.3);
-    doc.rect(boxX, contentY, boxW, photoH, 'FD');
-
-    // Guest Headline
-    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-    doc.setFont('times', 'bold');
-    doc.setFontSize(8);
-    const guestLabel = hasPlusOne
-      ? `HONOURED GUEST: ${guestName.toUpperCase()} · COUPLE ADMISSION (2 SEATS)`
-      : `HONOURED GUEST: ${guestName.toUpperCase()} · SINGLE ADMISSION (1 SEAT)`;
-    doc.text(guestLabel, boxX + boxW / 2, contentY + 6, { align: 'center' });
-
-    // Gemini Blessing
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.setFont('times', 'italic');
-    doc.setFontSize(7.5);
-    const splitBlessing = doc.splitTextToSize(`“${cardGemini.blessing}”`, boxW - 8);
-    doc.text(splitBlessing, boxX + boxW / 2, contentY + 13, { align: 'center' });
-
-    // Personalized dedication note
-    doc.setFont('times', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-    doc.text(`Official Guest Pass Ref: ${guestId}  ·  Verified Ceremony Credential`, boxX + boxW / 2, contentY + photoH - 4, { align: 'center' });
-  } else {
-    // Centered guest box if no photo
-    const guestBoxY = 44;
-    const guestBoxHeight = 32;
-    doc.setFillColor(isMidnight ? 36 : 255, isMidnight ? 34 : 255, isMidnight ? 30 : 255);
-    doc.setDrawColor(181, 154, 114);
-    doc.setLineWidth(0.3);
-    doc.rect(20, guestBoxY, width - 40, guestBoxHeight, 'FD');
-
-    doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-    doc.setFont('times', 'bold');
-    doc.setFontSize(8.5);
-    const guestLine = hasPlusOne
-      ? `HONOURED GUEST: ${guestName.toUpperCase()} · COUPLE ADMISSION (2 SEATS)`
-      : `HONOURED GUEST: ${guestName.toUpperCase()} · SINGLE ADMISSION (1 SEAT)`;
-    doc.text(guestLine, width / 2, guestBoxY + 6, { align: 'center' });
-
-    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-    doc.setFont('times', 'italic');
-    doc.setFontSize(8);
-    const splitBlessing = doc.splitTextToSize(`“${cardGemini.blessing}”`, width - 50);
-    doc.text(splitBlessing, width / 2, guestBoxY + 13.5, { align: 'center' });
-  }
-
-  // Agendas Section
-  const agendaY = 85;
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(9.5);
-  doc.text((wedding.date || wedding.rawDate).toUpperCase(), width / 2, agendaY, { align: 'center' });
-
-  // Event 1: Benediction
-  doc.setFontSize(8);
-  doc.text('WEDDING BENEDICTION · 13:00 · LION VOICE TABERNACLE', width / 2, agendaY + 5.5, { align: 'center' });
-  doc.setFont('times', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.text('11 Lower Maynard Rd Wynberg Station, Tailan Building Basement Hall', width / 2, agendaY + 9, { align: 'center' });
-
-  // Event 2: Evening Reception
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(8);
-  doc.text('EVENING RECEPTION · 18:00 TO 21:00 · ROOFTOP', width / 2, agendaY + 15, { align: 'center' });
-  doc.setFont('times', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.text('39 Salt River Road, Salt River, Cape Town, Western Cape, 7405', width / 2, agendaY + 18.5, { align: 'center' });
-
-  // Attire & Joel Scripture
-  const footerY = agendaY + 26;
-  doc.setTextColor(goldColor[0], goldColor[1], goldColor[2]);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(7);
-  doc.text('DRESS CODE: CHURCH CEREMONY: VINTAGE WEAR  ·  DINING CEREMONY: GALA WEAR', width / 2, footerY, { align: 'center' });
-
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(7.5);
-  doc.text('“I will restore to you the years that the swarming locust has eaten.”', width / 2, footerY + 4.5, { align: 'center' });
-
-  // Page 1 Footer Note
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(dimColor[0], dimColor[1], dimColor[2]);
-  doc.text(`PAGE 1 OF 2  ·  OFFICIAL CEREMONIAL INVITATION (FRONT)  ·  PASS REF: ${guestId}`, width / 2, height - 10.5, { align: 'center' });
-
-  /* ========================================================
-   * PAGE 2: BACK — QR DIGITAL VENUE PASS & PROTOCOL
-   * ======================================================== */
-  doc.addPage([210, 148], 'landscape');
+  doc.addPage([width, height], 'landscape');
 
   // Background
   doc.setFillColor(255, 255, 255);
@@ -938,7 +784,7 @@ export async function downloadUnifiedInvitationPDF({
   doc.text(`VERIFIED ID: ${guestId}  ·  LION VOICE TABERNACLE & ROOFTOP ACCESS  ·  ${coupleNames.toUpperCase()}`, width / 2, 18.5, { align: 'center' });
 
   // Two-Column Layout (Matching Landscape A5)
-  // LEFT COLUMN: Vector QR Code & Gate Scanner
+  // LEFT COLUMN: Couple Portrait + Vector QR Code & Gate Scanner
   const qrColX = 16;
   const qrBoxSize = 42;
   const qrBoxY = 28;
@@ -946,16 +792,31 @@ export async function downloadUnifiedInvitationPDF({
   doc.setFillColor(250, 247, 240);
   doc.setDrawColor(181, 154, 114);
   doc.setLineWidth(0.3);
-  doc.rect(qrColX, qrBoxY, qrBoxSize + 16, qrBoxSize + 22, 'FD');
+  doc.rect(qrColX, qrBoxY, qrBoxSize + 16, qrBoxSize + 52, 'FD');
+
+  // Couple photo portrait (IMG-20261107-WA0166.jpg) at top of Left Column
+  let qrStartY = qrBoxY + 4;
+  if (photoDataUrl) {
+    try {
+      const pSize = 20;
+      const pX = qrColX + (qrBoxSize + 16 - pSize) / 2;
+      doc.addImage(photoDataUrl, 'JPEG', pX, qrBoxY + 3, pSize, pSize);
+      doc.setDrawColor(212, 175, 55);
+      doc.setLineWidth(0.4);
+      doc.rect(pX, qrBoxY + 3, pSize, pSize, 'D');
+      qrStartY = qrBoxY + 26;
+    } catch {
+      qrStartY = qrBoxY + 4;
+    }
+  }
 
   // Draw 25x25 QR Matrix
   const qrPayload = `AURELIA-WEDDING:${wedding.slug}:GUEST:${guestId}:${guestName}`;
   const qrMatrix = generateQrMatrix(qrPayload);
   const matrixSize = 25;
-  const qrDrawSize = 34;
+  const qrDrawSize = 32;
   const cellSize = qrDrawSize / matrixSize;
   const qrStartX = qrColX + (qrBoxSize + 16 - qrDrawSize) / 2;
-  const qrStartY = qrBoxY + 4;
 
   doc.setFillColor(41, 39, 34);
   for (let r = 0; r < matrixSize; r++) {
@@ -976,23 +837,23 @@ export async function downloadUnifiedInvitationPDF({
   doc.setTextColor(181, 154, 114);
   doc.setFont('times', 'bold');
   doc.setFontSize(5.5);
-  doc.text('AU', centerBoxX + 3.5, centerBoxY + 5, { align: 'center' });
+  doc.text('SK', centerBoxX + 3.5, centerBoxY + 5, { align: 'center' });
 
   doc.setFont('courier', 'bold');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6.2);
   doc.setTextColor(115, 110, 102);
-  doc.text('SCAN FOR VENUE GATE ADMISSION', qrColX + (qrBoxSize + 16) / 2, qrBoxY + qrDrawSize + 8, { align: 'center' });
+  doc.text('SCAN FOR VENUE GATE ADMISSION', qrColX + (qrBoxSize + 16) / 2, qrStartY + qrDrawSize + 5.5, { align: 'center' });
 
   doc.setFont('courier', 'normal');
   doc.setFontSize(6);
   doc.setTextColor(181, 154, 114);
-  doc.text(`SECURITY TOKEN: ${guestId}`, qrColX + (qrBoxSize + 16) / 2, qrBoxY + qrDrawSize + 12, { align: 'center' });
+  doc.text(`SECURITY TOKEN: ${guestId}`, qrColX + (qrBoxSize + 16) / 2, qrStartY + qrDrawSize + 9.5, { align: 'center' });
 
   doc.setFont('times', 'italic');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6.2);
   doc.setTextColor(41, 39, 34);
   const splitProto = doc.splitTextToSize(`“${passGemini.protocolNote}”`, qrBoxSize + 12);
-  doc.text(splitProto, qrColX + (qrBoxSize + 16) / 2, qrBoxY + qrDrawSize + 16.5, { align: 'center' });
+  doc.text(splitProto, qrColX + (qrBoxSize + 16) / 2, qrStartY + qrDrawSize + 14, { align: 'center' });
 
   // RIGHT COLUMN: Guest Credential Table & Venues
   const rightColX = qrColX + qrBoxSize + 22;

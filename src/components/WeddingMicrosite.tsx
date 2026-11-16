@@ -689,19 +689,45 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
           <div className="absolute inset-0 z-20 bg-radial from-transparent via-[#1C1B18]/30 to-[#1C1B18]/70 pointer-events-none" />
         </div>
 
-        {/* Hero Content Overlay — Strictly Couple Names, Date, and Location */}
-        <div className="relative z-30 max-w-4xl mx-auto px-4 sm:px-6 py-28 sm:py-36 text-center flex flex-col items-center justify-center">
-          <h1 className="font-editorial text-5xl sm:text-7xl lg:text-8xl font-normal leading-tight tracking-tight text-[#FAF7F0] drop-shadow-lg">
+        {/* Hero Content Overlay */}
+        <div className="relative z-30 max-w-5xl mx-auto px-4 sm:px-6 py-24 sm:py-28 text-center flex flex-col items-center justify-center">
+          <p className="font-editorial italic text-base sm:text-xl md:text-2xl text-[#D4AF37] max-w-2xl mx-auto mb-5 sm:mb-6 tracking-wide drop-shadow-md">
+            &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo;
+          </p>
+
+          <h1 className="font-candlestick text-6xl sm:text-8xl lg:text-[9.5rem] font-normal leading-[1.15] tracking-normal text-[#FAF7F0] drop-shadow-xl px-2">
             Samson &amp; Kevine
           </h1>
 
-          <p className="font-editorial text-xl sm:text-2xl text-[#D4AF37] mt-6 sm:mt-7 tracking-[0.25em] font-medium drop-shadow-md">
+          <p className="font-editorial text-3xl sm:text-4xl lg:text-5xl text-[#D4AF37] mt-5 sm:mt-7 tracking-[0.25em] font-semibold drop-shadow-md">
             20 . 12 . 2026
           </p>
 
-          <p className="font-editorial text-sm sm:text-lg text-[#FAF7F0]/90 mt-2.5 tracking-[0.22em] uppercase font-light drop-shadow-sm">
+          <p className="font-editorial text-sm sm:text-lg text-[#FAF7F0]/90 mt-3 tracking-[0.22em] uppercase font-light drop-shadow-sm">
             Cape Town . South Africa
           </p>
+
+          {/* Live Countdown Timer directly below Cape Town, South Africa */}
+          <div className="flex items-center justify-center gap-3 sm:gap-5 text-center flex-wrap mt-8 sm:mt-10">
+            {[
+              { val: timeLeft.days, label: 'Days' },
+              { val: timeLeft.hours, label: 'Hours' },
+              { val: timeLeft.minutes, label: 'Mins' },
+              { val: timeLeft.seconds, label: 'Secs' }
+            ].map((unit) => (
+              <div
+                key={unit.label}
+                className="bg-[#1C1B18]/75 backdrop-blur-md px-4 sm:px-6 py-3 rounded-2xl shadow-xl min-w-[70px] sm:min-w-[88px] transform hover:scale-105 transition-transform"
+              >
+                <div className="font-editorial text-3xl sm:text-4xl font-normal tabular-nums text-[#FAF7F0]">
+                  {unit.val}
+                </div>
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#D4AF37] mt-1 font-mono font-medium">
+                  {unit.label}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Carousel Navigation Arrows */}
@@ -721,35 +747,13 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
         </button>
       </section>
 
-      {/* 1.2 COUNTDOWN & ACTION BUTTONS SECTION */}
+      {/* 1.2 SCRIPTURE & ACTION BUTTONS SECTION */}
       <section className="relative z-30 py-14 sm:py-16 bg-[#161513] text-white shadow-2xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           {/* Holy Matrimony Scripture Verse without chapter citation */}
-          <p className="font-editorial italic text-base sm:text-lg text-[#D4AF37] max-w-xl mx-auto mb-7 tracking-wide drop-shadow-sm">
+          <p className="font-editorial italic text-base sm:text-lg text-[#D4AF37] max-w-xl mx-auto mb-8 tracking-wide drop-shadow-sm">
             &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
           </p>
-
-          {/* Live Countdown Timer */}
-          <div className="flex items-center justify-center gap-3 sm:gap-6 text-center flex-wrap mb-9">
-            {[
-              { val: timeLeft.days, label: 'Days' },
-              { val: timeLeft.hours, label: 'Hours' },
-              { val: timeLeft.minutes, label: 'Mins' },
-              { val: timeLeft.seconds, label: 'Secs' }
-            ].map((unit) => (
-              <div
-                key={unit.label}
-                className="bg-[#22201D] backdrop-blur-md px-4 sm:px-6 py-3.5 rounded-2xl shadow-xl min-w-[70px] sm:min-w-[88px] transform hover:scale-105 transition-transform"
-              >
-                <div className="font-editorial text-3xl sm:text-4xl font-normal tabular-nums text-[#FAF7F0]">
-                  {unit.val}
-                </div>
-                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[#D4AF37] mt-1 font-mono font-medium">
-                  {unit.label}
-                </div>
-              </div>
-            ))}
-          </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md mx-auto justify-center">
@@ -1197,7 +1201,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                       </p>
                     </div>
 
-                    <div className="max-w-md mx-auto">
+                    <div className="max-w-xl mx-auto">
                       <InvitationCardPreview
                         wedding={wedding}
                         guestName={generatedPass.fullName}
@@ -1416,7 +1420,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
 
       {/* 6. HONEYMOON FUND & GIFT REGISTRY */}
 
-      <section className="py-16 bg-[#EFEAE2]/60 text-center">
+      <section id="microsite-registry" className="py-16 bg-[#EFEAE2]/60 text-center scroll-mt-16">
         <div className="max-w-2xl mx-auto px-4">
           <Gift className="w-6 h-6 text-[#8C6D45] mx-auto mb-2" />
           <h3 className="font-editorial text-3xl text-[#292722] mb-2">

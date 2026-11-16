@@ -26,7 +26,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
   const p1First = wedding.partner1.split(' ')[0] || wedding.partner1;
   const p2First = wedding.partner2.split(' ')[0] || wedding.partner2;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -34,36 +34,61 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
     const p1Clean = p1First.toLowerCase();
     const p2Clean = p2First.toLowerCase();
 
-    // Check if input matches both first names (e.g. "sarah & james", "james & sarah", "alex & anna", etc.)
+    // Check if input matches both first names
     const matchesCoupleNames =
       (inputClean.includes(p1Clean) && inputClean.includes(p2Clean)) ||
-      (inputClean.includes('alex') && inputClean.includes('anna')) ||
       inputClean === `${p1Clean} & ${p2Clean}` ||
       inputClean === `${p1Clean} and ${p2Clean}`;
 
-    // Passcode check (allow 2027 or love or empty if names match closely)
-    const validPasscode = !passcode || passcode.trim() === '2027' || passcode.trim().length >= 4;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          credential: credentialInput,
+          passcode,
+          partner1: p1First,
+          partner2: p2First
+        })
+      });
 
-    if (matchesCoupleNames && validPasscode) {
-      setIsSuccess(true);
-      setTimeout(() => {
-        onAuthenticated();
-        onClose();
-        setIsSuccess(false);
-      }, 700);
-    } else if (!matchesCoupleNames) {
-      setError(
-        `Invalid couple credential. Please enter both partner first names (e.g. "${p1First} & ${p2First}" or "Alex & Anna").`
-      );
-    } else {
-      setError('Invalid PIN passcode. Please enter 2027.');
+      const data = await res.json();
+      if (res.ok && data.authenticated) {
+        if (data.sessionToken) {
+          try {
+            sessionStorage.setItem('aurelia_couple_token', data.sessionToken);
+          } catch {
+            // ignore
+          }
+        }
+        setIsSuccess(true);
+        setTimeout(() => {
+          onAuthenticated();
+          onClose();
+          setIsSuccess(false);
+        }, 700);
+        return;
+      }
+
+      setError(data.error || 'Invalid credentials or PIN passcode.');
+    } catch {
+      // Offline / client-only fallback
+      const validPasscode = passcode.trim() === '2026';
+      if (matchesCoupleNames && validPasscode) {
+        setIsSuccess(true);
+        setTimeout(() => {
+          onAuthenticated();
+          onClose();
+          setIsSuccess(false);
+        }, 700);
+      } else if (!matchesCoupleNames) {
+        setError(
+          `Invalid couple credential. Please enter both partner first names (${p1First} & ${p2First}).`
+        );
+      } else {
+        setError('Invalid PIN passcode. Please enter the valid administrative PIN.');
+      }
     }
-  };
-
-  const handleQuickDemoFill = () => {
-    setCredentialInput(`${p1First} & ${p2First}`);
-    setPasscode('2027');
-    setError(null);
   };
 
   return (
@@ -116,49 +141,35 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
               required
               value={credentialInput}
               onChange={(e) => setCredentialInput(e.target.value)}
-              placeholder={`e.g. ${p1First} & ${p2First} or Alex & Anna`}
+              placeholder={`${p1First} & ${p2First}`}
               className="w-full px-3.5 py-3 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
             />
-            <span className="text-[10px] text-neutral-500 mt-1 block">
-              Format: Both partners&apos; first names joined by &amp; (e.g. &ldquo;{p1First} &amp; {p2First}&rdquo;)
-            </span>
           </div>
 
           <div>
             <label className="block font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-              Admin Passcode / PIN
+              Admin Passcode / PIN <span className="text-[#8C6D45]">*</span>
             </label>
             <div className="relative">
               <input
                 type="password"
+                required
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                placeholder="2027"
+                placeholder="Enter PIN passcode"
                 className="w-full px-3.5 py-3 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
               />
               <KeyRound className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3.5 opacity-60" />
             </div>
-            <span className="text-[10px] text-neutral-500 mt-1 block">
-              Standard administrative PIN: <strong className="text-[#292722]">2027</strong>
-            </span>
           </div>
 
-          <div className="pt-2 space-y-2">
+          <div className="pt-2">
             <button
               type="submit"
               className="w-full py-3.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors shadow-sm flex items-center justify-center gap-2 min-h-[44px]"
             >
               <ShieldCheck className="w-4 h-4 text-[#B59A72]" />
               <span>Sign In as Couple Admin</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleQuickDemoFill}
-              className="w-full py-2 px-3 bg-white hover:bg-neutral-100 text-[#8C6D45] text-[10px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-            >
-              <KeyRound className="w-3 h-3" />
-              <span>Autofill Assigned Credential ({p1First} &amp; {p2First})</span>
             </button>
           </div>
         </form>

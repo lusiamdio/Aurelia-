@@ -29,12 +29,20 @@
   font-family: 'Pinyon Script', 'Alex Brush', cursive, serif;
 }
 
+.font-candlestick {
+  font-family: 'Candlescript', 'Candlestick', 'Great Vibes', 'Alex Brush', 'Pinyon Script', cursive, serif;
+}
+
 .font-alex {
   font-family: 'Alex Brush', 'Pinyon Script', cursive, serif;
 }
 
 .font-playfair {
   font-family: 'Playfair Display', Georgia, serif;
+}
+
+.font-marcellus {
+  font-family: 'Marcellus', 'Cormorant Garamond', Georgia, serif;
 }
 
 .font-cinzel {

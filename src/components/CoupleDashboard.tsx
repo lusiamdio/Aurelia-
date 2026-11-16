@@ -352,8 +352,8 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
         })
       });
       const data = await res.json();
-      if (data.setflow) {
-        setAiDjCuratorAdvice(data.setflow);
+      if (data.setflow || data.plan) {
+        setAiDjCuratorAdvice(data.setflow || data.plan);
       } else {
         setAiDjCuratorAdvice(
           `DJ SETFLOW & ENERGY CURVE:\n\n1. Cocktail & Seated Dinner: At Last (Etta James), La Vie En Rose (Édith Piaf)\n2. Cake Cutting & First Dance: Stand by Me (Ben E. King)\n3. Prime Dancefloor Peak: Can’t Take My Eyes Off You (Frankie Valli), September (Earth Wind & Fire)\n4. Golden Midnight Singalong: Don’t Stop Believin’ (Journey)`

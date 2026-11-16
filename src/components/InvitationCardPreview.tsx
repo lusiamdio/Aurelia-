@@ -4,14 +4,12 @@ import {
   InvitationStyle,
   FoilAccent,
   PaperTone,
-  CardOrientation,
-  DecorativeGraphic,
-  PhotoFrameStyle,
-  WaxSealStyle
+  CardOrientation
 } from '../types/wedding';
 import { QRCodeSVG } from '../utils/qrCode';
-import { Calendar, MapPin, CheckCircle, ShieldCheck, Crown, Heart, Download, Loader2, Sparkles, Layers } from 'lucide-react';
+import { Calendar, MapPin, CheckCircle, ShieldCheck, Download, Loader2, Layers } from 'lucide-react';
 import { downloadCeremonyCardPDF, downloadDigitalVenuePassPDF, downloadUnifiedInvitationPDF } from '../utils/pdfGenerator';
+import { BlackGoldEInviteCard } from './BlackGoldEInviteCard';
 
 interface InvitationCardPreviewProps {
   wedding: WeddingData;
@@ -131,10 +129,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
     }
   };
 
-  const style = overrideStyle || wedding.invitationStyle;
-  const foil = overrideFoil || wedding.foilAccent;
   const paper = overridePaper || wedding.paperTone;
-  const orientation = overrideOrientation || wedding.cardOrientation || 'portrait';
 
   // Check custom branding colors
   const isCustomPalette = wedding.customColors?.isCustom;
@@ -165,157 +160,8 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
     }
   };
 
-  // Foil accent style / class
-  const getFoilStyle = (): React.CSSProperties | undefined => {
-    if (isCustomPalette && customFoil) {
-      return {
-        background: `linear-gradient(135deg, ${customFoil} 0%, #FAF7F0 45%, ${customFoil} 70%, #9A7B4F 100%)`,
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent'
-      };
-    }
-    return undefined;
-  };
+  const isDark = isCustomPalette ? false : paper === 'midnight';
 
-  const getFoilClass = () => {
-    if (isCustomPalette) return '';
-    switch (foil) {
-      case 'rose':
-        return 'rose-foil-text';
-      case 'silver':
-        return 'silver-foil-text';
-      case 'blind':
-        return paper === 'midnight' ? 'text-[#FAF7F0]/90' : 'text-[#3E3A33]';
-      case 'gold':
-      default:
-        return 'gold-foil-text';
-    }
-  };
-
-  const isDark = isCustomPalette
-    ? false
-    : paper === 'midnight';
-
-  const isLandscape = orientation === 'landscape';
-
-  // Dynamic typography font selector support
-  const getFontClass = () => {
-    switch (wedding.selectedFontFamily) {
-      case 'playfair':
-        return 'font-playfair';
-      case 'cinzel':
-        return 'font-cinzel tracking-wider uppercase';
-      case 'bodoni':
-        return 'font-bodoni';
-      case 'jakarta':
-        return 'font-jakarta font-semibold';
-      case 'montserrat':
-        return 'font-montserrat font-medium';
-      case 'cormorant':
-      default:
-        return 'font-editorial';
-    }
-  };
-
-  // Render decorative graphic
-  const renderDecorativeMotif = () => {
-    const motif = wedding.decorativeGraphic || 'botanical';
-    if (motif === 'none') return null;
-
-    if (motif === 'botanical') {
-      return (
-        <div className="flex items-center justify-center gap-2 text-[#B59A72] my-1 opacity-90">
-          <svg className="w-6 h-4 rotate-180" viewBox="0 0 24 16" fill="currentColor">
-            <path d="M0,8 C6,2 14,3 24,0 C18,6 14,14 0,8 Z" />
-          </svg>
-          <span className="text-[10px] uppercase font-serif tracking-[0.2em] font-semibold text-current">✦</span>
-          <svg className="w-6 h-4" viewBox="0 0 24 16" fill="currentColor">
-            <path d="M0,8 C6,2 14,3 24,0 C18,6 14,14 0,8 Z" />
-          </svg>
-        </div>
-      );
-    }
-
-    if (motif === 'crest') {
-      return (
-        <div className="flex items-center justify-center gap-1.5 text-[#D4AF37] my-1">
-          <Crown className="w-4 h-4" />
-        </div>
-      );
-    }
-
-    if (motif === 'artdeco') {
-      return (
-        <div className="flex items-center justify-center gap-2 text-[#B59A72] my-1">
-          <div className="w-6 h-[1px] bg-current" />
-          <div className="w-2 h-2 rotate-45 border border-current" />
-          <div className="w-6 h-[1px] bg-current" />
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  // Render Wax Seal Insignia
-  const renderWaxSeal = () => {
-    const sealType = wedding.waxSealStyle || 'monogram';
-    return (
-      <div
-        className={`w-9 h-9 rounded-full card-wax-shadow flex items-center justify-center border transition-transform duration-300 hover:scale-105 ${
-          isDark
-            ? 'bg-[#8C6D45] border-[#D4AF37]/40 text-[#1C1B18]'
-            : 'bg-[#B59A72] border-[#FAF7F0]/40 text-white'
-        }`}
-        style={isCustomPalette ? { backgroundColor: customFoil || '#B59A72' } : {}}
-      >
-        {sealType === 'crest' ? (
-          <Crown className="w-4 h-4 text-white" />
-        ) : sealType === 'heart' ? (
-          <Heart className="w-4 h-4 text-white fill-white" />
-        ) : sealType === 'botanical' ? (
-          <svg className="w-4 h-4 text-white fill-current" viewBox="0 0 24 24">
-            <path d="M12 2C6.5 7 4 12 4 16c0 3.3 2.7 6 6 6 1.4 0 2.8-.5 3.8-1.4 1 1 2.4 1.4 3.8 1.4 3.3 0 6-2.7 6-6 0-4-2.5-9-8-14zm-1 17.9c-2.2 0-4-1.8-4-4 0-2.8 1.9-6.8 5-10.4v14.4zm2 0V5.5c3.1 3.6 5 7.6 5 10.4 0 2.2-1.8 4-4 4z" />
-          </svg>
-        ) : (
-          <span className="font-editorial text-xs font-bold tracking-tighter">
-            {wedding.partner1[0]}
-            {wedding.partner2[0]}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  // Render Couple Photo on Card
-  const renderCouplePhoto = () => {
-    const photoUrl = wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg';
-    if (wedding.showPhotoOnCard === false && !wedding.couplePhotoUrl) return null;
-    const frame = wedding.photoFrameStyle || 'arch';
-
-    const frameClasses = () => {
-      switch (frame) {
-        case 'cameo':
-          return 'w-24 h-24 rounded-full border-2 border-[#B59A72]/50 shadow-md overflow-hidden mx-auto my-2';
-        case 'inset':
-          return 'w-32 h-24 rounded-xs border border-[#B59A72]/40 shadow-sm overflow-hidden mx-auto my-2';
-        case 'arch':
-        default:
-          return 'w-24 h-32 rounded-t-full border border-[#B59A72]/40 shadow-md overflow-hidden mx-auto my-2';
-      }
-    };
-
-    return (
-      <div className={frameClasses()}>
-        <img
-          src={photoUrl}
-          alt={`${wedding.partner1} & ${wedding.partner2}`}
-          referrerPolicy="no-referrer"
-          className="w-full h-full object-cover object-center"
-        />
-      </div>
-    );
-  };
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -331,7 +177,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
                 : 'text-[#292722]/70 hover:text-[#292722]'
             }`}
           >
-            Ceremony Invitation Card (Landscape)
+            Wedding E-Invite (1:1)
           </button>
           <button
             type="button"
@@ -380,273 +226,40 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
       {/* Main Printable / Display Card Container */}
       <div
         id="printable-invitation-pass"
-        className={`relative transition-all duration-300 rounded-sm paper-deckle border ${getPaperClasses()} ${
+        className={`relative transition-all duration-300 ${
           compact ? 'scale-95' : ''
         } ${
-          isLandscape
-            ? 'w-full max-w-[620px] p-6 sm:p-8 min-h-[440px]'
-            : 'w-full max-w-[440px] p-6 sm:p-8 min-h-[620px]'
+          activeTab === 'card'
+            ? 'w-full max-w-[546px]'
+            : `rounded-sm paper-deckle ${getPaperClasses()} w-full max-w-[460px] p-6 sm:p-8 min-h-[600px]`
         }`}
-        style={{
-          ['--card-bg' as string]: customBg || '#FAF7F0',
-          ['--card-foil' as string]: customFoil || '#D4AF37',
-          ['--card-text' as string]: customText || '#292722',
-          ['--card-border' as string]: customBorder || '#B59A72',
-          ...(isCustomPalette
-            ? {
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--card-text)',
-                borderColor: 'var(--card-border)'
+        style={
+          activeTab === 'card'
+            ? undefined
+            : {
+                ['--card-bg' as string]: customBg || '#FAF7F0',
+                ['--card-foil' as string]: customFoil || '#D4AF37',
+                ['--card-text' as string]: customText || '#292722',
+                ['--card-border' as string]: customBorder || '#B59A72',
+                ...(isCustomPalette
+                  ? {
+                      backgroundColor: 'var(--card-bg)',
+                      color: 'var(--card-text)'
+                    }
+                  : {}),
+                boxShadow: isDark
+                  ? '0 20px 40px -10px rgba(0,0,0,0.6), inset 0 0 40px rgba(212,175,55,0.05)'
+                  : '0 20px 40px -15px rgba(41,39,34,0.12), inset 0 0 50px rgba(181,154,114,0.08)'
               }
-            : {}),
-          boxShadow: isDark
-            ? '0 20px 40px -10px rgba(0,0,0,0.6), inset 0 0 40px rgba(212,175,55,0.05)'
-            : '0 20px 40px -15px rgba(41,39,34,0.12), inset 0 0 50px rgba(181,154,114,0.08)'
-        }}
+        }
       >
-        {/* Decorative Inner Border */}
-        <div
-          className={`absolute inset-3 sm:inset-4 pointer-events-none rounded-xs border ${
-            style === 'royal'
-              ? 'border-[#D4AF37]/50'
-              : style === 'minimalist'
-              ? 'border-neutral-300'
-              : 'border-[#B59A72]/30'
-          }`}
-          style={isCustomPalette && customBorder ? { borderColor: `${customBorder}40` } : {}}
-        >
-          {/* Ornate corner marks */}
-          {(style === 'classic' || style === 'royal' || wedding.decorativeGraphic === 'artdeco') && (
-            <>
-              <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-[#B59A72]" />
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-[#B59A72]" />
-              <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-[#B59A72]" />
-              <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-[#B59A72]" />
-            </>
-          )}
-
-          {/* Arch graphic motif */}
-          {(style === 'minimalist' || wedding.decorativeGraphic === 'arch') && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-32 h-20 border-t border-x border-neutral-300/60 rounded-t-full pointer-events-none" />
-          )}
-        </div>
-
         {activeTab === 'card' ? (
-          /* FRONT INVITATION VIEW */
-          isLandscape ? (
-            /* LANDSCAPE LAYOUT */
-            <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-6 items-center min-h-[380px]">
-              {/* Left Column: Photo / Crest */}
-              <div className="md:col-span-5 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-[#B59A72]/20 pb-4 md:pb-0 md:pr-4">
-                {wedding.showPhotoOnCard !== false && (wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg') ? (
-                  <div className="w-full max-w-[200px] aspect-4/5 rounded-t-full border border-[#B59A72]/40 overflow-hidden shadow-md">
-                    <img
-                      src={wedding.couplePhotoUrl || '/src/assets/images/IMG-20261107-WA0166.jpg'}
-                      alt={`${wedding.partner1} & ${wedding.partner2}`}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center py-6">
-                    <div className="w-16 h-16 rounded-full border border-[#B59A72]/40 flex items-center justify-center mb-2">
-                      <span className="font-editorial text-2xl font-light italic text-[#8C6D45]">
-                        {wedding.monogram}
-                      </span>
-                    </div>
-                    {renderDecorativeMotif()}
-                  </div>
-                )}
-                <div className="mt-3">{renderWaxSeal()}</div>
-              </div>
-
-              {/* Right Column: Invitation Typography & Guest Salutation */}
-              <div className="md:col-span-7 flex flex-col items-center text-center justify-between py-1">
-                <div>
-                  <p
-                    className={`text-[10px] uppercase tracking-[0.25em] font-medium ${
-                      isDark ? 'text-neutral-400' : 'text-[#7A746B]'
-                    }`}
-                  >
-                    {wedding.headline || 'Together with their families'}
-                  </p>
-                  <h1 className={`${getFontClass()} text-2xl sm:text-3xl lg:text-4xl leading-tight font-normal tracking-wide mt-1`}>
-                    <span className={getFoilClass()} style={getFoilStyle()}>{wedding.partner1}</span>
-                    <span className="italic text-lg mx-1.5 text-[#B59A72]">&amp;</span>
-                    <span className={getFoilClass()} style={getFoilStyle()}>{wedding.partner2}</span>
-                  </h1>
-                </div>
-
-                {/* Highlighted Guest Name */}
-                <div className="my-3 w-full">
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-neutral-500 mb-1">
-                    Request the pleasure of the company of
-                  </p>
-                  <div
-                    className={`py-2 px-4 rounded-xl ${
-                      isDark ? 'bg-white/5' : 'bg-[#B59A72]/10'
-                    }`}
-                  >
-                    <h3 className="font-editorial text-lg sm:text-xl font-semibold">
-                      {displayName}
-                      {hasPlusOne && (
-                        <span className="block text-xs font-sans-ui font-normal text-[#8C6D45] mt-0.5">
-                          {plusOneName ? `& ${plusOneName}` : '· Couple Admission (2 Seats)'}
-                        </span>
-                      )}
-                    </h3>
-                  </div>
-                  <p className="font-editorial italic text-xs mt-1 text-[#5A554E]">
-                    &ldquo;We would be delighted to have you celebrate with us.&rdquo;
-                  </p>
-                </div>
-
-                {/* Agenda & Scripture on Landscape Invitation Card */}
-                <div className="pt-2 w-full text-[10px] space-y-1.5">
-                  <p className="font-editorial italic text-[10.5px] text-[#8C6D45] leading-snug">
-                    &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-left bg-black/5 dark:bg-white/5 p-2 rounded-xl">
-                    <div>
-                      <span className="font-semibold block font-editorial text-[11px] text-[#292722] dark:text-[#FAF7F0]">
-                        Wedding Benediction · 13:00
-                      </span>
-                      <span className="block text-[9.5px] text-neutral-600 dark:text-neutral-400">Lion Voice Tabernacle</span>
-                      <span className="block text-[8.5px] text-neutral-500 truncate">11 Lower Maynard Rd Wynberg</span>
-                      <span className="text-[#8C6D45] text-[8.5px] font-mono uppercase block font-semibold">Vintage Wear</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold block font-editorial text-[11px] text-[#292722] dark:text-[#FAF7F0]">
-                        Evening Reception · 18:00–21:00
-                      </span>
-                      <span className="block text-[9.5px] text-neutral-600 dark:text-neutral-400">Rooftop, 39 Salt River Rd</span>
-                      <span className="block text-[8.5px] text-neutral-500 truncate">Salt River, Cape Town</span>
-                      <span className="text-[#8C6D45] text-[8.5px] font-mono uppercase block font-semibold">Gala Wear</span>
-                    </div>
-                  </div>
-                  <p className="font-editorial italic text-[9.5px] text-neutral-500">
-                    &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo;
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* PORTRAIT LAYOUT */
-            <div className="relative z-10 flex flex-col items-center text-center justify-between h-full min-h-[560px]">
-              {/* Top Monogram / Motif */}
-              <div className="pt-1 flex flex-col items-center">
-                {renderDecorativeMotif()}
-                <div className="font-editorial italic text-base text-[#8C6D45] mb-0.5">
-                  {wedding.monogram}
-                </div>
-                <p
-                  className={`text-[10px] sm:text-xs uppercase tracking-[0.25em] font-medium ${
-                    isDark ? 'text-neutral-400' : 'text-[#7A746B]'
-                  }`}
-                >
-                  {wedding.headline || 'Celebration of Love'}
-                </p>
-              </div>
-
-              {/* Couple Photo if active */}
-              {renderCouplePhoto()}
-
-              {/* Couple Names */}
-              <div className="py-2 my-auto">
-                <h1 className={`${getFontClass()} text-3xl sm:text-4xl lg:text-[40px] leading-tight font-normal tracking-wide`}>
-                  <span className={getFoilClass()} style={getFoilStyle()}>{wedding.partner1}</span>
-                  <span className="block font-editorial italic text-2xl my-0.5 text-[#B59A72]">
-                    &amp;
-                  </span>
-                  <span className={getFoilClass()} style={getFoilStyle()}>{wedding.partner2}</span>
-                </h1>
-              </div>
-
-              {/* Request Pleasure & Guest Name Slot */}
-              <div className="py-1 w-full max-w-xs">
-                <p
-                  className={`text-[10px] sm:text-[11px] tracking-[0.2em] uppercase mb-1.5 ${
-                    isDark ? 'text-neutral-400' : 'text-[#7A746B]'
-                  }`}
-                >
-                  Request the pleasure of the company of
-                </p>
-
-                {/* Highlighted Guest Name */}
-                <div
-                  className={`py-2 px-4 rounded-xl ${
-                    isDark ? 'bg-white/5' : 'bg-[#B59A72]/10'
-                  }`}
-                >
-                  <h3 className="font-editorial text-lg sm:text-xl font-semibold tracking-wide">
-                    {displayName}
-                    {hasPlusOne && (
-                      <span className="block text-xs font-sans-ui font-normal text-[#8C6D45] mt-0.5">
-                        {plusOneName ? `& ${plusOneName}` : '· Couple Admission (2 Seats)'}
-                      </span>
-                    )}
-                  </h3>
-                </div>
-              </div>
-
-              {/* Wedding Agenda, Venues & Scriptures on Portrait Card */}
-              <div className="pt-2 pb-1 w-full space-y-1.5">
-                <p className="font-editorial italic text-xs text-[#8C6D45]">
-                  &ldquo;Therefore what God has joined together, let no one separate.&rdquo;
-                </p>
-
-                <p className="text-[11px] uppercase tracking-[0.18em] font-semibold text-[#292722] dark:text-[#FAF7F0]">
-                  {wedding.date} · Cape Town
-                </p>
-
-                {/* Agenda events */}
-                <div className="space-y-1.5 text-left bg-black/5 dark:bg-white/5 p-2 rounded-xl text-[11px]">
-                  <div className="pb-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold font-editorial text-xs text-[#292722] dark:text-[#FAF7F0]">
-                        Wedding Benediction · 13:00
-                      </span>
-                      <span className="text-[8.5px] font-mono uppercase tracking-wider text-[#8C6D45] font-semibold">
-                        Vintage Wear
-                      </span>
-                    </div>
-                    <span className="block text-[10px] text-neutral-600 dark:text-neutral-300">
-                      Lion Voice Tabernacle
-                    </span>
-                    <span className="block text-[9px] text-neutral-500">
-                      11 Lower Maynard Rd Wynberg Station, Tailan Building
-                    </span>
-                  </div>
-
-                  <div className="pt-0.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold font-editorial text-xs text-[#292722] dark:text-[#FAF7F0]">
-                        Evening Reception · 18:00 to 21:00
-                      </span>
-                      <span className="text-[8.5px] font-mono uppercase tracking-wider text-[#8C6D45] font-semibold">
-                        Gala Wear
-                      </span>
-                    </div>
-                    <span className="block text-[10px] text-neutral-600 dark:text-neutral-300">
-                      Rooftop, 39 Salt River Road
-                    </span>
-                    <span className="block text-[9px] text-neutral-500">
-                      Salt River, Cape Town, Western Cape
-                    </span>
-                  </div>
-                </div>
-
-                <p className="font-editorial italic text-[10px] text-neutral-500">
-                  &ldquo;I will restore to you the years that the swarming locust has eaten.&rdquo;
-                </p>
-
-                {/* Wax Seal Badge */}
-                <div className="mt-1 flex items-center justify-center">
-                  {renderWaxSeal()}
-                </div>
-              </div>
-            </div>
-          )
+          /* FRONT INVITATION VIEW: BLACK & GOLD 1:1 WEDDING E-INVITE */
+          <BlackGoldEInviteCard
+            wedding={wedding}
+            guestName={displayName}
+            hasPlusOne={hasPlusOne}
+          />
         ) : (
           /* DIGITAL VENUE PASS & QR CODE VIEW */
           <div className="relative z-10 flex flex-col items-center justify-between h-full min-h-[560px]">
@@ -782,7 +395,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
           </span>
         </div>
         <span className="text-[10px] font-mono uppercase tracking-wider text-[#8C6D45] hidden sm:inline">
-          {activeTab === 'card' ? 'Ceremony Invitation' : 'QR Venue Gate Pass'}
+          {activeTab === 'card' ? 'Black & Gold E-Invite (1:1)' : 'QR Venue Gate Pass'}
         </span>
       </div>
 
@@ -800,7 +413,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
               {downloadingType === 'unified'
                 ? 'Unified Front & Back Invitation (2 Pages)'
                 : downloadingType === 'card'
-                ? 'Landscape Ceremony Card (Front)'
+                ? 'Black & Gold E-Invite (Front)'
                 : 'QR Venue Gate Pass (Back)'}
             </span>
           </div>
@@ -891,14 +504,14 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
             </div>
           </div>
           <p className="text-xs text-neutral-300 font-sans leading-relaxed">
-            Downloads both sides unified into one document at the same time: Page 1 (Front: Bespoke Ceremony Keepsake Card with photo &amp; blessing) &amp; Page 2 (Back: Digital Venue Gate Pass with high-density QR code &amp; gate protocol).
+            Downloads both sides unified into one document at the same time: Page 1 (Front: Black &amp; Gold 1:1 Wedding E-Invite) &amp; Page 2 (Back: Digital Venue Gate Pass with couple portrait, high-density QR code &amp; gate protocol).
           </p>
           <div className="mt-3 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-[#D4AF37]">
             <span className="font-semibold">Complete 2-Page Document</span>
             <span>·</span>
             <span>Front &amp; Back Unified</span>
             <span>·</span>
-            <span>Print-Ready A5</span>
+            <span>1:1 E-Invite + A5 Pass</span>
           </div>
         </button>
 
@@ -911,7 +524,7 @@ export const InvitationCardPreview: React.FC<InvitationCardPreviewProps> = ({
             disabled={downloadingType !== null}
             className="text-[#8C6D45] hover:underline transition-colors font-medium cursor-pointer disabled:opacity-50"
           >
-            Front Only (Ceremony Card)
+            Front Only (Black &amp; Gold E-Invite)
           </button>
           <span>·</span>
           <button
