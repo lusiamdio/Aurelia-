@@ -288,6 +288,7 @@ interface ServerStore {
   weddings: Record<string, { weddingPayload: any; eventRows: any[] }>;
   guests: any[];
   songs: any[];
+  deletedSongIds: string[];
 }
 
 function readServerStore(): ServerStore {
@@ -297,13 +298,14 @@ function readServerStore(): ServerStore {
       return {
         weddings: parsed.weddings && typeof parsed.weddings === 'object' ? parsed.weddings : {},
         guests: Array.isArray(parsed.guests) ? parsed.guests : [],
-        songs: Array.isArray(parsed.songs) ? parsed.songs : []
+        songs: Array.isArray(parsed.songs) ? parsed.songs : [],
+        deletedSongIds: Array.isArray(parsed.deletedSongIds) ? parsed.deletedSongIds : []
       };
     }
   } catch {
     // fallback to empty store
   }
-  return { weddings: {}, guests: [], songs: [] };
+  return { weddings: {}, guests: [], songs: [], deletedSongIds: [] };
 }
 
 function writeServerStore(store: ServerStore): void {
@@ -383,7 +385,11 @@ app.post('/api/public/rsvp', async (req, res) => {
 
   if (supabaseServer) {
     try {
-      await supabaseServer.from('guest_invitations').insert(guestRow);
+      if (hasSupabaseAdminPrivilege) {
+        await supabaseServer.from('guest_invitations').upsert(guestRow, { onConflict: 'id' });
+      } else {
+        await supabaseServer.from('guest_invitations').insert(guestRow);
+      }
     } catch {
       // ignore if schema not initialized yet or duplicate
     }
@@ -449,7 +455,9 @@ app.get('/api/public/wedding', (req, res) => {
   res.json({
     weddingPayload: savedWedding?.weddingPayload || null,
     eventRows: savedWedding?.eventRows || null,
-    songs
+    songs,
+    deletedSongIds: store.deletedSongIds || [],
+    hasSupabaseAdminPrivilege
   });
 });
 
@@ -573,9 +581,16 @@ app.put('/api/admin/wedding', requireCoupleAdmin, async (req, res) => {
     return res.status(400).json({ synced: false, error: 'Invalid wedding payload.' });
   }
 
+  const safeWeddingPayload = {
+    ...weddingPayload,
+    raw_date: /^\d{4}-\d{2}-\d{2}$/.test(String(weddingPayload.raw_date || ''))
+      ? String(weddingPayload.raw_date)
+      : '2026-12-20'
+  };
+
   const store = readServerStore();
-  store.weddings[weddingPayload.id] = {
-    weddingPayload,
+  store.weddings[safeWeddingPayload.id] = {
+    weddingPayload: safeWeddingPayload,
     eventRows: Array.isArray(eventRows) ? eventRows : []
   };
   writeServerStore(store);
@@ -583,7 +598,7 @@ app.put('/api/admin/wedding', requireCoupleAdmin, async (req, res) => {
   if (supabaseServer && hasSupabaseAdminPrivilege) {
     const { error: wErr } = await supabaseServer
       .from('weddings')
-      .upsert(weddingPayload, { onConflict: 'id' });
+      .upsert(safeWeddingPayload, { onConflict: 'id' });
     if (wErr) return res.status(400).json({ synced: false, error: wErr.message });
 
     if (Array.isArray(eventRows) && eventRows.length > 0) {
@@ -625,8 +640,10 @@ app.patch('/api/admin/songs/:id', requireCoupleAdmin, async (req, res) => {
   const idx = store.songs.findIndex((s) => s.id === songId);
   if (idx >= 0) {
     store.songs[idx] = { ...store.songs[idx], ...req.body };
-    writeServerStore(store);
+  } else {
+    store.songs.unshift({ id: songId, wedding_id: 'wed-aur-001', ...req.body });
   }
+  writeServerStore(store);
 
   if (supabaseServer && hasSupabaseAdminPrivilege) {
     const { error } = await supabaseServer
@@ -642,6 +659,9 @@ app.delete('/api/admin/songs/:id', requireCoupleAdmin, async (req, res) => {
   const songId = String(req.params.id || '');
   const store = readServerStore();
   store.songs = store.songs.filter((s) => s.id !== songId);
+  if (!store.deletedSongIds.includes(songId)) {
+    store.deletedSongIds.push(songId);
+  }
   writeServerStore(store);
 
   if (supabaseServer && hasSupabaseAdminPrivilege) {
@@ -656,6 +676,7 @@ app.delete('/api/admin/erase/:weddingId', requireCoupleAdmin, async (req, res) =
   const store = readServerStore();
   store.guests = store.guests.filter((g) => (g.wedding_id || 'wed-aur-001') !== weddingId);
   store.songs = store.songs.filter((s) => (s.wedding_id || 'wed-aur-001') !== weddingId);
+  store.deletedSongIds = [];
   delete store.weddings[weddingId];
   writeServerStore(store);
 

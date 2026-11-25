@@ -257,6 +257,17 @@ export async function fetchWeddingFromSupabase(slug = 'samson-kevine'): Promise<
   wedding: WeddingData | null;
   schemaMissing: boolean;
 }> {
+  const localPromise = fetch(
+    `/api/public/wedding?weddingId=${encodeURIComponent(DEFAULT_WEDDING_ID)}`
+  )
+    .then(async (res) => (res.ok ? res.json() : null))
+    .catch(() => null);
+
+  let dbWeddingRow: any = null;
+  let dbEventRows: any[] = [];
+  let dbSongRows: any[] = [];
+  let schemaMissing = false;
+
   if (supabase) {
     const { data: weddingRow, error: wErr } = await supabase
       .from('weddings')
@@ -264,7 +275,10 @@ export async function fetchWeddingFromSupabase(slug = 'samson-kevine'): Promise<
       .eq('slug', slug)
       .maybeSingle();
 
-    if (!wErr && weddingRow) {
+    if (wErr && isMissingTableError(wErr)) {
+      schemaMissing = true;
+    } else if (!wErr && weddingRow) {
+      dbWeddingRow = weddingRow;
       const [{ data: eventRows }, { data: songRows }] = await Promise.all([
         supabase
           .from('wedding_events')
@@ -277,45 +291,83 @@ export async function fetchWeddingFromSupabase(slug = 'samson-kevine'): Promise<
           .eq('wedding_id', weddingRow.id)
           .order('created_at', { ascending: false })
       ]);
-
-      const events = (eventRows || []).map(mapEventFromRow);
-      const songs = (songRows || []).map(mapSongFromRow);
-      return {
-        wedding: mapWeddingFromRow(weddingRow, events, songs),
-        schemaMissing: false
-      };
-    }
-
-    if (wErr && !isMissingTableError(wErr)) {
+      dbEventRows = eventRows || [];
+      dbSongRows = songRows || [];
+    } else if (wErr) {
       console.warn('Error loading wedding from Supabase:', wErr.message);
     }
+  } else {
+    schemaMissing = true;
   }
 
-  // Fallback to server store (if schema not initialized yet or Supabase row absent)
-  try {
-    const res = await fetch(`/api/public/wedding?weddingId=${encodeURIComponent(DEFAULT_WEDDING_ID)}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.weddingPayload) {
-        const events = Array.isArray(data.eventRows) ? data.eventRows.map(mapEventFromRow) : [];
-        const songs = Array.isArray(data.songs) ? data.songs.map(mapSongFromRow) : [];
-        return {
-          wedding: mapWeddingFromRow(data.weddingPayload, events, songs),
-          schemaMissing: true
-        };
-      }
-      if (Array.isArray(data.songs) && data.songs.length > 0) {
-        return {
-          wedding: { ...INITIAL_WEDDING, songRequests: data.songs.map(mapSongFromRow) },
-          schemaMissing: true
-        };
+  const localData = await localPromise;
+  const deletedSongSet = new Set<string>(
+    Array.isArray(localData?.deletedSongIds) ? localData.deletedSongIds : []
+  );
+
+  // Merge songs cleanly across Supabase + server store overrides
+  const songMap = new Map<string, SongRequest>();
+  for (const row of dbSongRows) {
+    if (!deletedSongSet.has(row.id)) {
+      songMap.set(row.id, mapSongFromRow(row));
+    }
+  }
+  if (Array.isArray(localData?.songs)) {
+    for (const row of localData.songs) {
+      if (deletedSongSet.has(row.id)) continue;
+      const existing = songMap.get(row.id);
+      if (existing) {
+        songMap.set(row.id, {
+          ...existing,
+          status: row.status ?? existing.status,
+          djNotes: row.dj_notes ?? existing.djNotes,
+          notes: row.notes ?? existing.notes,
+          danceEnergy: row.dance_energy ?? existing.danceEnergy
+        });
+      } else if (row.song_title && row.artist) {
+        songMap.set(row.id, mapSongFromRow(row));
       }
     }
-  } catch {
-    // ignore fallback error
+  }
+  const mergedSongs = Array.from(songMap.values());
+
+  // If Supabase Admin privilege is active, Supabase row is authoritative;
+  // otherwise prefer server-saved studio edits when present.
+  const useLocalWeddingOverride =
+    !localData?.hasSupabaseAdminPrivilege && Boolean(localData?.weddingPayload);
+
+  const effectiveWeddingRow = useLocalWeddingOverride
+    ? localData.weddingPayload
+    : dbWeddingRow || localData?.weddingPayload || null;
+
+  const effectiveEventRows =
+    useLocalWeddingOverride && Array.isArray(localData?.eventRows) && localData.eventRows.length > 0
+      ? localData.eventRows
+      : dbEventRows.length > 0
+      ? dbEventRows
+      : Array.isArray(localData?.eventRows)
+      ? localData.eventRows
+      : [];
+
+  if (effectiveWeddingRow) {
+    return {
+      wedding: mapWeddingFromRow(
+        effectiveWeddingRow,
+        effectiveEventRows.map(mapEventFromRow),
+        mergedSongs
+      ),
+      schemaMissing
+    };
   }
 
-  return { wedding: null, schemaMissing: true };
+  if (mergedSongs.length > 0) {
+    return {
+      wedding: { ...INITIAL_WEDDING, songRequests: mergedSongs },
+      schemaMissing
+    };
+  }
+
+  return { wedding: null, schemaMissing };
 }
 
 export async function saveWeddingToSupabase(wedding: WeddingData): Promise<{ error?: string }> {
