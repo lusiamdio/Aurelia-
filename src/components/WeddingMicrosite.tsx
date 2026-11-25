@@ -283,6 +283,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
   const [dietary, setDietary] = useState('');
   const [attendance, setAttendance] = useState<'attending' | 'declined'>('attending');
   const [generatedPass, setGeneratedPass] = useState<GuestInvitation | null>(null);
+  const [editingGuestId, setEditingGuestId] = useState<string | null>(null);
   const [isDownloadingPass, setIsDownloadingPass] = useState(false);
 
   // Active FAQ
@@ -405,7 +406,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
     if (!guestName.trim()) return;
 
     const isCouple = attendanceType === 'couple';
-    const guestId = `AUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const guestId = editingGuestId || `AUR-${Math.floor(1000 + Math.random() * 9000)}`;
     const guest: GuestInvitation = {
       id: guestId,
       fullName: guestName.trim(),
@@ -422,6 +423,7 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
     };
 
     setGeneratedPass(guest);
+    setEditingGuestId(null);
     onGuestRegistered(guest);
 
     try {
@@ -1264,7 +1266,11 @@ export const WeddingMicrosite: React.FC<WeddingMicrositeProps> = ({
                         Save to WhatsApp
                       </button>
                       <button
-                        onClick={() => setGeneratedPass(null)}
+                        type="button"
+                        onClick={() => {
+                          setEditingGuestId(generatedPass.id);
+                          setGeneratedPass(null);
+                        }}
                         className="px-4 py-2 bg-neutral-100 text-neutral-700 hover:bg-neutral-200 text-[11px] uppercase tracking-wider rounded-full shadow-xs transition-colors"
                       >
                         Edit Details

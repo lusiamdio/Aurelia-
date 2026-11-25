@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { WeddingData, GuestInvitation, InvitationStyle, SongRequest } from './types/wedding';
 import { INITIAL_WEDDING, INITIAL_GUESTS } from './data/mockWedding';
 import { Navbar } from './components/Navbar';
@@ -14,9 +14,21 @@ import { CoupleAuthModal } from './components/CoupleAuthModal';
 import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
 import { Check } from 'lucide-react';
+import {
+  getCurrentAdminSession,
+  signOutAdminFromSupabase,
+  fetchWeddingFromSupabase,
+  saveWeddingToSupabase,
+  fetchGuestsFromSupabase,
+  insertGuestToSupabase,
+  updateGuestInSupabase,
+  deleteGuestFromSupabase,
+  insertSongRequestToSupabase,
+  eraseWeddingDataFromSupabase
+} from './services/supabaseService';
 
 export default function App() {
-  // Persistent Wedding Data
+  // Persistent Wedding Data (synced with Supabase & cached locally)
   const [wedding, setWedding] = useState<WeddingData>(() => {
     try {
       const saved = localStorage.getItem('aurelia_wedding_data_v4');
@@ -35,29 +47,11 @@ export default function App() {
     return INITIAL_WEDDING;
   });
 
-  // Persistent Guest Roster (Starts completely empty)
-  const [guests, setGuests] = useState<GuestInvitation[]>(() => {
-    try {
-      localStorage.removeItem('aurelia_guests_data');
-      localStorage.removeItem('aurelia_guests_data_v2');
-      localStorage.removeItem('aurelia_guests_data_v3');
-      const saved = localStorage.getItem('aurelia_guests_data_v4');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return INITIAL_GUESTS;
-  });
+  // Guest Roster (fetched from Supabase when authenticated as Couple Admin)
+  const [guests, setGuests] = useState<GuestInvitation[]>(INITIAL_GUESTS);
 
-  // Role Gate: Guests only see the Couple Microsite by default.
-  // Couple signs in with their assigned admin credential (both first names, e.g. "Samson & Kevine")
-  const [isCoupleAdmin, setIsCoupleAdmin] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('aurelia_couple_admin') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  // Role Gate verified via server Bearer session held in memory
+  const [isCoupleAdmin, setIsCoupleAdmin] = useState<boolean>(false);
 
   // Active view: 'microsite' (default for guests) | 'landing' (Brand editorial) | 'studio' (Couple only) | 'dashboard' (Couple only)
   const [currentView, setCurrentView] = useState<'landing' | 'studio' | 'dashboard' | 'microsite'>('microsite');
@@ -68,7 +62,72 @@ export default function App() {
   const [emailPreviewGuest, setEmailPreviewGuest] = useState<GuestInvitation | null>(null);
   const [globalNotification, setGlobalNotification] = useState<string | null>(null);
 
-  // Sync to storage
+  const showToast = useCallback((msg: string, duration = 3500) => {
+    setGlobalNotification(msg);
+    setTimeout(() => setGlobalNotification(null), duration);
+  }, []);
+
+  // Clean up any legacy client-side auth flags on startup & hydrate public wedding from Supabase
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('aurelia_couple_admin');
+      sessionStorage.removeItem('aurelia_couple_token');
+      localStorage.removeItem('aurelia_guests_data');
+      localStorage.removeItem('aurelia_guests_data_v2');
+      localStorage.removeItem('aurelia_guests_data_v3');
+      localStorage.removeItem('aurelia_guests_data_v4');
+    } catch {
+      // ignore
+    }
+
+    let isMounted = true;
+
+    const initSupabaseData = async () => {
+      const [{ wedding: dbWedding }, adminState] = await Promise.all([
+        fetchWeddingFromSupabase('samson-kevine'),
+        getCurrentAdminSession()
+      ]);
+
+      if (!isMounted) return;
+
+      if (dbWedding) {
+        setWedding(dbWedding);
+      }
+
+      if (adminState.isAdmin) {
+        setIsCoupleAdmin(true);
+        const weddingId = dbWedding?.id || wedding.id;
+        const { guests: dbGuests } = await fetchGuestsFromSupabase(weddingId);
+        if (isMounted && dbGuests) {
+          setGuests(dbGuests);
+        }
+      }
+    };
+
+    void initSupabaseData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Load latest guest roster whenever Couple Admin is unlocked or switching to Dashboard
+  useEffect(() => {
+    if (!isCoupleAdmin) return;
+    let isMounted = true;
+    const loadRoster = async () => {
+      const { guests: dbGuests } = await fetchGuestsFromSupabase(wedding.id);
+      if (isMounted && dbGuests) {
+        setGuests(dbGuests);
+      }
+    };
+    void loadRoster();
+    return () => {
+      isMounted = false;
+    };
+  }, [isCoupleAdmin, currentView, wedding.id]);
+
+  // Cache wedding config locally for instant initial render
   useEffect(() => {
     try {
       localStorage.setItem('aurelia_wedding_data_v4', JSON.stringify(wedding));
@@ -77,13 +136,19 @@ export default function App() {
     }
   }, [wedding]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('aurelia_guests_data_v4', JSON.stringify(guests));
-    } catch {
-      // ignore
-    }
-  }, [guests]);
+  // Role Protected Navigation Guard
+  const handleNavigate = useCallback(
+    (view: 'landing' | 'studio' | 'dashboard' | 'microsite') => {
+      if ((view === 'studio' || view === 'dashboard') && !isCoupleAdmin) {
+        setPendingTargetView(view);
+        setShowAuthModal(true);
+        return;
+      }
+      setCurrentView(view);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [isCoupleAdmin]
+  );
 
   // Handle URL hash changes
   useEffect(() => {
@@ -102,51 +167,40 @@ export default function App() {
     handleHash();
     window.addEventListener('hashchange', handleHash);
     return () => window.removeEventListener('hashchange', handleHash);
-  }, [isCoupleAdmin]);
+  }, [handleNavigate]);
 
-  // Role Protected Navigation Guard
-  const handleNavigate = (view: 'landing' | 'studio' | 'dashboard' | 'microsite') => {
-    if ((view === 'studio' || view === 'dashboard') && !isCoupleAdmin) {
-      setPendingTargetView(view);
-      setShowAuthModal(true);
-      return;
-    }
-    setCurrentView(view);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleAuthenticated = () => {
+  const handleAuthenticated = async () => {
     setIsCoupleAdmin(true);
-    try {
-      sessionStorage.setItem('aurelia_couple_admin', 'true');
-    } catch {
-      // ignore
+    const { guests: dbGuests } = await fetchGuestsFromSupabase(wedding.id);
+    if (dbGuests) {
+      setGuests(dbGuests);
     }
-    const dest = pendingTargetView || 'studio';
+    const dest = pendingTargetView || 'dashboard';
     setCurrentView(dest);
     setPendingTargetView(null);
-    setGlobalNotification(`Welcome, ${wedding.partner1} & ${wedding.partner2}! Couple Admin access unlocked.`);
-    setTimeout(() => setGlobalNotification(null), 4000);
+    showToast(`Welcome, ${wedding.partner1} & ${wedding.partner2}! Couple Admin access unlocked.`, 4000);
   };
 
-  const handleLogoutAdmin = () => {
+  const handleLogoutAdmin = async () => {
+    await signOutAdminFromSupabase();
     setIsCoupleAdmin(false);
-    try {
-      sessionStorage.removeItem('aurelia_couple_admin');
-    } catch {
-      // ignore
-    }
+    setGuests([]);
     setCurrentView('microsite');
-    setGlobalNotification('Signed out of Couple Admin. Showing guest view.');
-    setTimeout(() => setGlobalNotification(null), 3000);
+    showToast('Signed out of Couple Admin. Showing guest view.', 3000);
   };
 
   // Complete Microsite & Data Erasure Right (GDPR / POPIA compliant)
-  const handleDeleteMicrositeAndData = () => {
+  const handleDeleteMicrositeAndData = async () => {
+    if (isCoupleAdmin) {
+      await eraseWeddingDataFromSupabase(wedding.id);
+      await saveWeddingToSupabase(INITIAL_WEDDING);
+      await signOutAdminFromSupabase();
+    }
     try {
       localStorage.removeItem('aurelia_wedding_data');
+      localStorage.removeItem('aurelia_wedding_data_v4');
       localStorage.removeItem('aurelia_guests_data');
-      sessionStorage.removeItem('aurelia_couple_admin');
+      localStorage.removeItem('aurelia_guests_data_v4');
     } catch {
       // ignore
     }
@@ -154,17 +208,23 @@ export default function App() {
     setWedding(INITIAL_WEDDING);
     setGuests(INITIAL_GUESTS);
     setCurrentView('microsite');
-    setGlobalNotification(
-      'Your wedding microsite, stationery designs, guest registry, and DJ song requests have been permanently erased.'
+    showToast(
+      'Your wedding microsite, stationery designs, guest registry, and DJ song requests have been permanently erased.',
+      6000
     );
-    setTimeout(() => setGlobalNotification(null), 6000);
   };
 
-  const handleUpdateWedding = (updated: WeddingData) => {
+  const handleUpdateWedding = async (updated: WeddingData) => {
     setWedding(updated);
+    if (isCoupleAdmin) {
+      const res = await saveWeddingToSupabase(updated);
+      if (res.error) {
+        showToast(`Saved locally. Sync note: ${res.error}`, 4500);
+      }
+    }
   };
 
-  const handleGuestRegistered = (newGuest: GuestInvitation) => {
+  const handleGuestRegistered = async (newGuest: GuestInvitation) => {
     setGuests((prev) => {
       const existingIdx = prev.findIndex((g) => g.id === newGuest.id);
       if (existingIdx >= 0) {
@@ -174,13 +234,60 @@ export default function App() {
       }
       return [newGuest, ...prev];
     });
+
+    const res = await insertGuestToSupabase(newGuest, wedding.id);
+    if (res.error) {
+      console.warn('RSVP sync note:', res.error);
+      showToast(`RSVP saved in session (${newGuest.fullName}).`, 3500);
+    } else {
+      showToast(`RSVP registered for ${newGuest.fullName} (Pass ID: ${newGuest.id}).`, 4000);
+    }
+  };
+
+  const handleUpdateGuestsFromDashboard = async (updatedGuests: GuestInvitation[]) => {
+    const prevMap = new Map(guests.map((g) => [g.id, g]));
+    const nextMap = new Map(updatedGuests.map((g) => [g.id, g]));
+    setGuests(updatedGuests);
+
+    if (!isCoupleAdmin) return;
+
+    for (const prevGuest of guests) {
+      if (!nextMap.has(prevGuest.id)) {
+        const res = await deleteGuestFromSupabase(prevGuest.id);
+        if (res.error) console.warn('Supabase guest delete error:', res.error);
+      }
+    }
+
+    for (const nextGuest of updatedGuests) {
+      const prevGuest = prevMap.get(nextGuest.id);
+      if (!prevGuest) {
+        const res = await insertGuestToSupabase(nextGuest, wedding.id);
+        if (res.error) console.warn('Supabase guest insert error:', res.error);
+      } else if (JSON.stringify(prevGuest) !== JSON.stringify(nextGuest)) {
+        const res = await updateGuestInSupabase(nextGuest, wedding.id);
+        if (res.error) console.warn('Supabase guest update error:', res.error);
+      }
+    }
+  };
+
+  const handleSongRequested = async (song: SongRequest) => {
+    setWedding((prev) => ({
+      ...prev,
+      songRequests: [song, ...(prev.songRequests || [])]
+    }));
+    const res = await insertSongRequestToSupabase(song, wedding.id);
+    if (res.error) {
+      console.warn('Supabase song insert note:', res.error);
+    }
+    showToast(`Song request "${song.songTitle}" sent to couple's DJ registry!`);
   };
 
   const handleSelectStyle = (styleId: InvitationStyle) => {
-    setWedding((prev) => ({
-      ...prev,
-      invitationStyle: styleId
-    }));
+    const nextWedding = { ...wedding, invitationStyle: styleId };
+    setWedding(nextWedding);
+    if (isCoupleAdmin) {
+      void saveWeddingToSupabase(nextWedding);
+    }
   };
 
   const handleJumpToGenerator = (styleId: InvitationStyle) => {
@@ -241,14 +348,7 @@ export default function App() {
             }}
             onOpenDashboard={() => handleNavigate('dashboard')}
             onLogoutAdmin={handleLogoutAdmin}
-            onSongRequested={(song) => {
-              setWedding((prev) => ({
-                ...prev,
-                songRequests: [song, ...(prev.songRequests || [])]
-              }));
-              setGlobalNotification(`Song request "${song.songTitle}" sent to couple's DJ registry!`);
-              setTimeout(() => setGlobalNotification(null), 3500);
-            }}
+            onSongRequested={handleSongRequested}
           />
         )}
 
@@ -283,7 +383,7 @@ export default function App() {
         )}
 
         {/* VIEW 3: COUPLE STUDIO & ATELIER (Couple Admin Only) */}
-        {currentView === 'studio' && (
+        {currentView === 'studio' && isCoupleAdmin && (
           <CoupleStudio
             wedding={wedding}
             onUpdateWedding={handleUpdateWedding}
@@ -295,11 +395,11 @@ export default function App() {
         )}
 
         {/* VIEW 4: COUPLE DASHBOARD, RSVPs & DJ PLAYLIST (Couple Admin Only) */}
-        {currentView === 'dashboard' && (
+        {currentView === 'dashboard' && isCoupleAdmin && (
           <CoupleDashboard
             wedding={wedding}
             guests={guests}
-            onUpdateGuests={(updated) => setGuests(updated)}
+            onUpdateGuests={handleUpdateGuestsFromDashboard}
             onUpdateWedding={handleUpdateWedding}
             onClose={() => setCurrentView('microsite')}
             onOpenStudio={() => handleNavigate('studio')}
@@ -322,7 +422,6 @@ export default function App() {
         onClose={() => setShowAuthModal(false)}
         onAuthenticated={handleAuthenticated}
       />
-
 
       {/* Email Delivery Preview Modal */}
       {emailPreviewGuest && (

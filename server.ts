@@ -1,8 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
@@ -16,50 +18,662 @@ const port = Number(process.env.PORT) || 3000;
 process.on('uncaughtException', (err) => {
   console.error('Server uncaughtException:', err);
 });
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('Server unhandledRejection:', reason);
 });
 
 app.use(express.json());
 
-// Server-side Couple Admin Auth (matches database/schema.sql authenticate_couple_admin workflow)
-const ADMIN_PIN_HASH = crypto.createHash('sha256').update(process.env.COUPLE_ADMIN_PIN || '2026').digest();
+// Supabase Configuration (from environment variables — never hardcoded)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabasePublishableKey =
+  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 
-app.post('/api/auth/login', (req, res) => {
-  const { credential, passcode, partner1, partner2 } = req.body || {};
-  const inputClean = String(credential || '').trim().toLowerCase();
-  const p1Clean = String(partner1 || 'Samson').split(' ')[0].toLowerCase();
-  const p2Clean = String(partner2 || 'Kevine').split(' ')[0].toLowerCase();
+const supabaseServer =
+  supabaseUrl && (supabaseServiceRoleKey || supabasePublishableKey)
+    ? createClient(supabaseUrl, (supabaseServiceRoleKey || supabasePublishableKey)!, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      })
+    : null;
 
-  const matchesCoupleNames =
-    (inputClean.includes(p1Clean) && inputClean.includes(p2Clean)) ||
-    inputClean === `${p1Clean} & ${p2Clean}` ||
-    inputClean === `${p1Clean} and ${p2Clean}`;
+const hasSupabaseAdminPrivilege = Boolean(supabaseUrl && supabaseServiceRoleKey);
 
-  if (!matchesCoupleNames) {
-    return res.status(401).json({
+// In-memory session signing key (reads SESSION_SECRET if configured, otherwise generated securely in memory)
+const SESSION_SIGNING_KEY =
+  (process.env.SESSION_SECRET || '').trim() || crypto.randomBytes(32).toString('hex');
+
+// Optional first-run fallback passcode hash (used ONLY when COUPLE_ADMIN_PASSCODE env var is unset)
+let claimedAdminPasscodeHash: string | null = null;
+
+function getConfiguredAdminPasscode(): string {
+  return (process.env.COUPLE_ADMIN_PASSCODE || '').trim();
+}
+
+function constantTimeMatch(a: string, b: string): boolean {
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
+function hashPasscodeScrypt(passcode: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(passcode, salt, 64).toString('hex');
+  return `${salt}:${derived}`;
+}
+
+function verifyPasscodeScrypt(passcode: string, storedHash: string): boolean {
+  const [salt, keyHex] = storedHash.split(':');
+  if (!salt || !keyHex) return false;
+  const derived = crypto.scryptSync(passcode, salt, 64);
+  const storedBuf = Buffer.from(keyHex, 'hex');
+  if (derived.length !== storedBuf.length) return false;
+  return crypto.timingSafeEqual(derived, storedBuf);
+}
+
+function verifySubmittedPasscode(submittedPassword: string): boolean {
+  const configured = getConfiguredAdminPasscode();
+  if (configured) {
+    return constantTimeMatch(submittedPassword.trim(), configured);
+  }
+  if (claimedAdminPasscodeHash) {
+    return verifyPasscodeScrypt(submittedPassword.trim(), claimedAdminPasscodeHash);
+  }
+  return false;
+}
+
+async function getAuthoritativeCoupleFirstNames(): Promise<[string, string]> {
+  let p1 = 'Samson';
+  let p2 = 'Kevine';
+
+  if (supabaseServer) {
+    try {
+      const { data } = await supabaseServer
+        .from('weddings')
+        .select('partner1, partner2')
+        .eq('slug', 'samson-kevine')
+        .maybeSingle();
+      if (data?.partner1) p1 = String(data.partner1);
+      if (data?.partner2) p2 = String(data.partner2);
+    } catch {
+      // use public wedding defaults
+    }
+  }
+
+  return [
+    (p1.trim().split(/\s+/)[0] || p1).toLowerCase(),
+    (p2.trim().split(/\s+/)[0] || p2).toLowerCase()
+  ];
+}
+
+function matchesBothCoupleFirstNames(input: string, p1First: string, p2First: string): boolean {
+  const tokens = new Set((input.toLowerCase().match(/[a-z]+/g) || []));
+  return tokens.has(p1First) && tokens.has(p2First);
+}
+
+function issueAdminBearerToken(coupleLabel: string): { token: string; expiresAt: number } {
+  const now = Date.now();
+  const expiresAt = now + 12 * 60 * 60 * 1000;
+  const payload = Buffer.from(
+    JSON.stringify({ role: 'couple_admin', couple: coupleLabel, iat: now, exp: expiresAt })
+  ).toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', SESSION_SIGNING_KEY)
+    .update(payload)
+    .digest('base64url');
+  return { token: `${payload}.${sig}`, expiresAt };
+}
+
+function verifyAdminBearerToken(token: string): { role: string; couple: string; exp: number } | null {
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [payload, sig] = parts;
+  if (!payload || !sig) return null;
+
+  const expectedSig = crypto
+    .createHmac('sha256', SESSION_SIGNING_KEY)
+    .update(payload)
+    .digest('base64url');
+
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!parsed || parsed.role !== 'couple_admin' || typeof parsed.exp !== 'number') {
+      return null;
+    }
+    if (Date.now() > parsed.exp) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function requireCoupleAdmin(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required. Please sign in as Couple Admin.' });
+  }
+
+  const session = verifyAdminBearerToken(token);
+  if (!session) {
+    return res.status(401).json({ error: 'Invalid or expired admin session.' });
+  }
+
+  (req as any).adminSession = session;
+  return next();
+}
+
+function sanitizeCsvCell(value: unknown): string {
+  const str = String(value ?? '').replace(/"/g, '""');
+  const safe = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+  return `"${safe}"`;
+}
+
+// Check whether server admin passcode is configured or claimed
+app.get('/api/auth/status', (_req, res) => {
+  const configured = Boolean(getConfiguredAdminPasscode());
+  res.json({
+    passcodeConfigured: configured,
+    claimed: Boolean(claimedAdminPasscodeHash),
+    requiresSetup: !configured && !claimedAdminPasscodeHash
+  });
+});
+
+// Verify active Bearer session token
+app.get('/api/auth/session', requireCoupleAdmin, (req, res) => {
+  const session = (req as any).adminSession;
+  res.json({
+    authenticated: true,
+    role: 'couple_admin',
+    couple: session?.couple
+  });
+});
+
+// One-time bootstrap claim (only active if COUPLE_ADMIN_PASSCODE is unset and not yet claimed)
+app.post('/api/auth/claim', async (req, res) => {
+  if (getConfiguredAdminPasscode() || claimedAdminPasscodeHash) {
+    return res.status(403).json({
       authenticated: false,
-      error: 'Invalid couple credential. Please enter both partner first names.'
+      error: 'Admin access is already configured.'
     });
   }
 
-  const submittedHash = crypto.createHash('sha256').update(String(passcode || '').trim()).digest();
-  const validPin = crypto.timingSafeEqual(submittedHash, ADMIN_PIN_HASH);
-
-  if (!validPin) {
-    return res.status(401).json({
+  const { coupleNames, password } = req.body || {};
+  if (!coupleNames || !password || String(password).trim().length < 4) {
+    return res.status(400).json({
       authenticated: false,
-      error: 'Invalid PIN passcode. Please enter the valid administrative PIN.'
+      error: 'Valid couple credentials and password are required.'
     });
   }
 
-  const sessionToken = crypto.randomBytes(32).toString('hex');
+  const [p1First, p2First] = await getAuthoritativeCoupleFirstNames();
+  if (!matchesBothCoupleFirstNames(String(coupleNames), p1First, p2First)) {
+    return res.status(401).json({
+      authenticated: false,
+      error: 'Invalid couple credentials.'
+    });
+  }
+
+  claimedAdminPasscodeHash = hashPasscodeScrypt(String(password).trim());
+  const { token, expiresAt } = issueAdminBearerToken(`${p1First} & ${p2First}`);
   return res.status(200).json({
     authenticated: true,
     role: 'couple_admin',
-    sessionToken,
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    accessToken: token,
+    expiresAt
   });
+});
+
+// Couple Admin Sign In (Both First Names + Password verified server-side)
+app.post('/api/auth/login', async (req, res) => {
+  const { coupleNames, password } = req.body || {};
+  if (!coupleNames || !password) {
+    return res.status(400).json({
+      authenticated: false,
+      error: 'Couple names and password are required.'
+    });
+  }
+
+  const configured = getConfiguredAdminPasscode();
+  if (!configured && !claimedAdminPasscodeHash) {
+    return res.status(409).json({
+      authenticated: false,
+      requiresSetup: true,
+      error: 'Admin password has not been configured yet.'
+    });
+  }
+
+  const [p1First, p2First] = await getAuthoritativeCoupleFirstNames();
+  const namesMatch = matchesBothCoupleFirstNames(String(coupleNames), p1First, p2First);
+  const passwordMatch = verifySubmittedPasscode(String(password));
+
+  if (!namesMatch || !passwordMatch) {
+    return res.status(401).json({
+      authenticated: false,
+      error: 'Invalid couple credentials or password.'
+    });
+  }
+
+  const { token, expiresAt } = issueAdminBearerToken(`${p1First} & ${p2First}`);
+  return res.status(200).json({
+    authenticated: true,
+    role: 'couple_admin',
+    accessToken: token,
+    expiresAt
+  });
+});
+
+// ============================================================================
+// SERVER-SIDE PERSISTENT STORE + SUPABASE DUAL SYNC
+// ============================================================================
+
+const DATA_DIR = path.resolve(__dirname, '.data');
+const STORE_FILE = path.resolve(DATA_DIR, 'wedding_store.json');
+
+interface ServerStore {
+  weddings: Record<string, { weddingPayload: any; eventRows: any[] }>;
+  guests: any[];
+  songs: any[];
+}
+
+function readServerStore(): ServerStore {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
+      return {
+        weddings: parsed.weddings && typeof parsed.weddings === 'object' ? parsed.weddings : {},
+        guests: Array.isArray(parsed.guests) ? parsed.guests : [],
+        songs: Array.isArray(parsed.songs) ? parsed.songs : []
+      };
+    }
+  } catch {
+    // fallback to empty store
+  }
+  return { weddings: {}, guests: [], songs: [] };
+}
+
+function writeServerStore(store: ServerStore): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed writing server store:', err);
+  }
+}
+
+function sanitizeGuestRowInput(raw: any): any | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const fullName = String(raw.full_name || '').trim().slice(0, 160);
+  if (!fullName) return null;
+
+  const status = ['attending', 'declined', 'pending'].includes(raw.status)
+    ? raw.status
+    : 'pending';
+  const attendanceType = raw.attendance_type === 'couple' ? 'couple' : 'single';
+  const hasPlusOne = Boolean(raw.has_plus_one || attendanceType === 'couple');
+  const plusOneStatus = ['confirmed', 'rejected', 'pending'].includes(raw.plus_one_status)
+    ? raw.plus_one_status
+    : hasPlusOne
+    ? 'confirmed'
+    : 'pending';
+
+  return {
+    id: String(raw.id || `AUR-${Math.floor(1000 + Math.random() * 9000)}`).slice(0, 64),
+    wedding_id: String(raw.wedding_id || 'wed-aur-001').slice(0, 64),
+    full_name: fullName,
+    email: raw.email ? String(raw.email).trim().slice(0, 200) : null,
+    phone: raw.phone ? String(raw.phone).trim().slice(0, 64) : null,
+    status,
+    events_attending: Array.isArray(raw.events_attending)
+      ? raw.events_attending.map((x: unknown) => String(x)).slice(0, 20)
+      : [],
+    attendance_type: attendanceType,
+    has_plus_one: hasPlusOne,
+    plus_one_name: raw.plus_one_name ? String(raw.plus_one_name).trim().slice(0, 160) : null,
+    plus_one_dietary: raw.plus_one_dietary ? String(raw.plus_one_dietary).trim().slice(0, 250) : null,
+    plus_one_status: plusOneStatus,
+    plus_one_allowed: Boolean(raw.plus_one_allowed ?? hasPlusOne),
+    dietary_requirements: raw.dietary_requirements
+      ? String(raw.dietary_requirements).trim().slice(0, 300)
+      : null,
+    invitation_sent_via: ['whatsapp', 'email', 'download'].includes(raw.invitation_sent_via)
+      ? raw.invitation_sent_via
+      : 'download',
+    invitation_generated_at: String(
+      raw.invitation_generated_at || new Date().toISOString().replace('T', ' ').slice(0, 16)
+    ).slice(0, 64),
+    checked_in: Boolean(raw.checked_in),
+    checked_in_at: raw.checked_in_at ? String(raw.checked_in_at).slice(0, 32) : null,
+    notes: raw.notes ? String(raw.notes).trim().slice(0, 500) : null,
+    created_at: raw.created_at || new Date().toISOString()
+  };
+}
+
+// Public RSVP submission endpoint (never returns guest PII list)
+app.post('/api/public/rsvp', async (req, res) => {
+  const guestRow = sanitizeGuestRowInput(req.body);
+  if (!guestRow) {
+    return res.status(400).json({ ok: false, error: 'Full name is required to register an RSVP.' });
+  }
+
+  const store = readServerStore();
+  const idx = store.guests.findIndex((g) => g.id === guestRow.id);
+  if (idx >= 0) {
+    store.guests[idx] = { ...store.guests[idx], ...guestRow };
+  } else {
+    store.guests.unshift(guestRow);
+  }
+  writeServerStore(store);
+
+  if (supabaseServer) {
+    try {
+      await supabaseServer.from('guest_invitations').insert(guestRow);
+    } catch {
+      // ignore if schema not initialized yet or duplicate
+    }
+  }
+
+  return res.status(200).json({ ok: true, id: guestRow.id });
+});
+
+// Public Song request submission endpoint
+app.post('/api/public/songs', async (req, res) => {
+  const raw = req.body || {};
+  const songTitle = String(raw.song_title || '').trim().slice(0, 200);
+  const artist = String(raw.artist || '').trim().slice(0, 200);
+  const guestName = String(raw.guest_name || '').trim().slice(0, 160);
+  if (!songTitle || !artist || !guestName) {
+    return res.status(400).json({ ok: false, error: 'Song title, artist, and guest name are required.' });
+  }
+
+  const songRow = {
+    id: String(raw.id || `song-${Date.now()}`).slice(0, 64),
+    wedding_id: String(raw.wedding_id || 'wed-aur-001').slice(0, 64),
+    guest_name: guestName,
+    song_title: songTitle,
+    artist,
+    status: ['approved', 'must-play', 'declined', 'pending'].includes(raw.status)
+      ? raw.status
+      : 'pending',
+    notes: raw.notes ? String(raw.notes).trim().slice(0, 300) : null,
+    dj_notes: raw.dj_notes ? String(raw.dj_notes).trim().slice(0, 300) : null,
+    dance_energy: ['chill', 'mid-tempo', 'high-energy', 'party-anthem'].includes(raw.dance_energy)
+      ? raw.dance_energy
+      : 'high-energy',
+    requested_at: String(raw.requested_at || new Date().toISOString().slice(0, 10)).slice(0, 32),
+    votes: typeof raw.votes === 'number' ? raw.votes : 1
+  };
+
+  const store = readServerStore();
+  const idx = store.songs.findIndex((s) => s.id === songRow.id);
+  if (idx >= 0) {
+    store.songs[idx] = songRow;
+  } else {
+    store.songs.unshift(songRow);
+  }
+  writeServerStore(store);
+
+  if (supabaseServer) {
+    try {
+      await supabaseServer.from('song_requests').insert(songRow);
+    } catch {
+      // ignore if schema not initialized yet
+    }
+  }
+
+  return res.status(200).json({ ok: true, id: songRow.id });
+});
+
+// Public wedding config & playlist fallback read
+app.get('/api/public/wedding', (req, res) => {
+  const weddingId = String(req.query.weddingId || 'wed-aur-001');
+  const store = readServerStore();
+  const savedWedding = store.weddings[weddingId] || null;
+  const songs = store.songs.filter((s) => (s.wedding_id || 'wed-aur-001') === weddingId);
+  res.json({
+    weddingPayload: savedWedding?.weddingPayload || null,
+    eventRows: savedWedding?.eventRows || null,
+    songs
+  });
+});
+
+// ============================================================================
+// PROTECTED SUPABASE ADMIN CRUD ROUTES (COUPLE ADMIN ONLY)
+// ============================================================================
+
+app.get('/api/admin/guests', requireCoupleAdmin, async (req, res) => {
+  const weddingId = String(req.query.weddingId || 'wed-aur-001');
+  const store = readServerStore();
+  const localGuests = store.guests.filter((g) => (g.wedding_id || 'wed-aur-001') === weddingId);
+
+  if (!supabaseServer || !hasSupabaseAdminPrivilege) {
+    return res.json({ guests: localGuests });
+  }
+
+  const { data, error } = await supabaseServer
+    .from('guest_invitations')
+    .select('*')
+    .eq('wedding_id', weddingId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.json({ guests: localGuests, error: error.message });
+  }
+
+  const dbGuests = data || [];
+  const dbMap = new Map(dbGuests.map((g: any) => [g.id, g]));
+
+  // Sync any local-only RSVPs up to Supabase cleanly
+  for (const lg of localGuests) {
+    if (!dbMap.has(lg.id)) {
+      dbMap.set(lg.id, lg);
+      try {
+        await supabaseServer.from('guest_invitations').insert(lg);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const merged = Array.from(dbMap.values());
+  store.guests = [
+    ...merged,
+    ...store.guests.filter((g) => (g.wedding_id || 'wed-aur-001') !== weddingId)
+  ];
+  writeServerStore(store);
+
+  return res.json({ guests: merged });
+});
+
+app.post('/api/admin/guests', requireCoupleAdmin, async (req, res) => {
+  const guestRow = sanitizeGuestRowInput(req.body);
+  if (!guestRow) {
+    return res.status(400).json({ synced: false, error: 'Invalid guest details.' });
+  }
+
+  const store = readServerStore();
+  const idx = store.guests.findIndex((g) => g.id === guestRow.id);
+  if (idx >= 0) {
+    store.guests[idx] = { ...store.guests[idx], ...guestRow };
+  } else {
+    store.guests.unshift(guestRow);
+  }
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseServer
+      .from('guest_invitations')
+      .upsert(guestRow, { onConflict: 'id' });
+    if (error) return res.status(400).json({ synced: false, error: error.message });
+  }
+  return res.json({ synced: true });
+});
+
+app.patch('/api/admin/guests/:id', requireCoupleAdmin, async (req, res) => {
+  const guestId = String(req.params.id || '');
+  const guestRow = sanitizeGuestRowInput({ ...req.body, id: guestId });
+  if (!guestRow) {
+    return res.status(400).json({ synced: false, error: 'Invalid guest details.' });
+  }
+
+  const store = readServerStore();
+  const idx = store.guests.findIndex((g) => g.id === guestId);
+  if (idx >= 0) {
+    store.guests[idx] = { ...store.guests[idx], ...guestRow };
+  } else {
+    store.guests.unshift(guestRow);
+  }
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseServer
+      .from('guest_invitations')
+      .update(guestRow)
+      .eq('id', guestId);
+    if (error) return res.status(400).json({ synced: false, error: error.message });
+  }
+  return res.json({ synced: true });
+});
+
+app.delete('/api/admin/guests/:id', requireCoupleAdmin, async (req, res) => {
+  const guestId = String(req.params.id || '');
+  const store = readServerStore();
+  store.guests = store.guests.filter((g) => g.id !== guestId);
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseServer
+      .from('guest_invitations')
+      .delete()
+      .eq('id', guestId);
+    if (error) return res.status(400).json({ synced: false, error: error.message });
+  }
+  return res.json({ synced: true });
+});
+
+app.put('/api/admin/wedding', requireCoupleAdmin, async (req, res) => {
+  const { weddingPayload, eventRows } = req.body || {};
+  if (!weddingPayload?.id) {
+    return res.status(400).json({ synced: false, error: 'Invalid wedding payload.' });
+  }
+
+  const store = readServerStore();
+  store.weddings[weddingPayload.id] = {
+    weddingPayload,
+    eventRows: Array.isArray(eventRows) ? eventRows : []
+  };
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error: wErr } = await supabaseServer
+      .from('weddings')
+      .upsert(weddingPayload, { onConflict: 'id' });
+    if (wErr) return res.status(400).json({ synced: false, error: wErr.message });
+
+    if (Array.isArray(eventRows) && eventRows.length > 0) {
+      const { error: eErr } = await supabaseServer
+        .from('wedding_events')
+        .upsert(eventRows, { onConflict: 'id' });
+      if (eErr) return res.status(400).json({ synced: false, error: eErr.message });
+    }
+  }
+
+  return res.json({ synced: true });
+});
+
+app.post('/api/admin/songs', requireCoupleAdmin, async (req, res) => {
+  const songRow = req.body;
+  if (!songRow?.id || !songRow?.song_title) {
+    return res.status(400).json({ synced: false, error: 'Invalid song payload.' });
+  }
+
+  const store = readServerStore();
+  const idx = store.songs.findIndex((s) => s.id === songRow.id);
+  if (idx >= 0) {
+    store.songs[idx] = songRow;
+  } else {
+    store.songs.unshift(songRow);
+  }
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseServer.from('song_requests').insert(songRow);
+    if (error) return res.status(400).json({ synced: false, error: error.message });
+  }
+  return res.json({ synced: true });
+});
+
+app.patch('/api/admin/songs/:id', requireCoupleAdmin, async (req, res) => {
+  const songId = String(req.params.id || '');
+  const store = readServerStore();
+  const idx = store.songs.findIndex((s) => s.id === songId);
+  if (idx >= 0) {
+    store.songs[idx] = { ...store.songs[idx], ...req.body };
+    writeServerStore(store);
+  }
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseServer
+      .from('song_requests')
+      .update(req.body)
+      .eq('id', songId);
+    if (error) return res.status(400).json({ synced: false, error: error.message });
+  }
+  return res.json({ synced: true });
+});
+
+app.delete('/api/admin/songs/:id', requireCoupleAdmin, async (req, res) => {
+  const songId = String(req.params.id || '');
+  const store = readServerStore();
+  store.songs = store.songs.filter((s) => s.id !== songId);
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseServer.from('song_requests').delete().eq('id', songId);
+    if (error) return res.status(400).json({ synced: false, error: error.message });
+  }
+  return res.json({ synced: true });
+});
+
+app.delete('/api/admin/erase/:weddingId', requireCoupleAdmin, async (req, res) => {
+  const weddingId = String(req.params.weddingId || 'wed-aur-001');
+  const store = readServerStore();
+  store.guests = store.guests.filter((g) => (g.wedding_id || 'wed-aur-001') !== weddingId);
+  store.songs = store.songs.filter((s) => (s.wedding_id || 'wed-aur-001') !== weddingId);
+  delete store.weddings[weddingId];
+  writeServerStore(store);
+
+  if (supabaseServer && hasSupabaseAdminPrivilege) {
+    const { error: gErr } = await supabaseServer
+      .from('guest_invitations')
+      .delete()
+      .eq('wedding_id', weddingId);
+    if (gErr) return res.status(400).json({ synced: false, error: gErr.message });
+
+    const { error: sErr } = await supabaseServer
+      .from('song_requests')
+      .delete()
+      .eq('wedding_id', weddingId);
+    if (sErr) return res.status(400).json({ synced: false, error: sErr.message });
+  }
+
+  return res.json({ synced: true });
 });
 
 // Initialize GoogleGenAI server-side with User-Agent header
@@ -153,8 +767,8 @@ Provide 2 short options: Option 1 (Classic Formal) and Option 2 (Poetic Romantic
   }
 });
 
-// 3. AI DJ Playlist & Transitions Curator
-app.post('/api/ai/dj-playlist', async (req, res) => {
+// 3. AI DJ Playlist & Transitions Curator (Couple Admin Only)
+app.post('/api/ai/dj-playlist', requireCoupleAdmin, async (req, res) => {
   try {
     const { songRequests, coupleNames } = req.body;
     if (!ai) {
@@ -424,8 +1038,8 @@ Respond with a JSON object strictly following this structure:
   }
 });
 
-// Real-Time CSV Export & Gemini AI Roster Processing
-app.post('/api/export/csv', (req, res) => {
+// Real-Time CSV Export & Gemini AI Roster Processing (Couple Admin Only)
+app.post('/api/export/csv', requireCoupleAdmin, (req, res) => {
   try {
     const { guests, weddingTitle } = req.body;
     const guestList = Array.isArray(guests) ? guests : [];
@@ -446,20 +1060,20 @@ app.post('/api/export/csv', (req, res) => {
       const partyLabel = isCouple ? 'Couple' : 'Single';
       const seats = isCouple ? '2' : '1';
       return [
-        `"${g.id || ''}"`,
-        `"${(g.fullName || '').replace(/"/g, '""')}"`,
-        `"${partyLabel}"`,
+        sanitizeCsvCell(g.id || ''),
+        sanitizeCsvCell(g.fullName || ''),
+        sanitizeCsvCell(partyLabel),
         seats,
-        `"${g.status || 'pending'}"`,
-        `"${(g.dietaryRequirements || '').replace(/"/g, '""')}"`,
+        sanitizeCsvCell(g.status || 'pending'),
+        sanitizeCsvCell(g.dietaryRequirements || ''),
         g.checkedIn ? 'Yes' : 'No',
-        `"${g.checkedInAt || ''}"`,
-        `"${g.invitationGeneratedAt || ''}"`
+        sanitizeCsvCell(g.checkedInAt || ''),
+        sanitizeCsvCell(g.invitationGeneratedAt || '')
       ].join(',');
     });
 
     const csvData = [headers.join(','), ...rows].join('\r\n');
-    const filename = `${(weddingTitle || 'wedding').toLowerCase().replace(/\s+/g, '_')}_guests_realtime.csv`;
+    const filename = `${(weddingTitle || 'wedding').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_guests_realtime.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -470,8 +1084,8 @@ app.post('/api/export/csv', (req, res) => {
   }
 });
 
-// Gemini AI Real-Time CSV Roster Analysis & Export
-app.post('/api/ai/export-csv', async (req, res) => {
+// Gemini AI Real-Time CSV Roster Analysis & Export (Couple Admin Only)
+app.post('/api/ai/export-csv', requireCoupleAdmin, async (req, res) => {
   try {
     const { guests, weddingTitle } = req.body;
     const guestList = Array.isArray(guests) ? guests : [];
@@ -523,14 +1137,14 @@ Provide a 2-sentence executive seating and catering summary for the couple's ban
     const rows = guestList.map((g: any) => {
       const isCouple = g.attendanceType === 'couple' || g.hasPlusOne;
       return [
-        `"${g.id || ''}"`,
-        `"${(g.fullName || '').replace(/"/g, '""')}"`,
-        `"${isCouple ? 'Couple' : 'Single'}"`,
+        sanitizeCsvCell(g.id || ''),
+        sanitizeCsvCell(g.fullName || ''),
+        sanitizeCsvCell(isCouple ? 'Couple' : 'Single'),
         isCouple ? '2' : '1',
-        `"${g.status || 'pending'}"`,
-        `"${(g.dietaryRequirements || '').replace(/"/g, '""')}"`,
+        sanitizeCsvCell(g.status || 'pending'),
+        sanitizeCsvCell(g.dietaryRequirements || ''),
         g.checkedIn ? 'Yes' : 'No',
-        `"${g.checkedInAt || ''}"`
+        sanitizeCsvCell(g.checkedInAt || '')
       ].join(',');
     });
 

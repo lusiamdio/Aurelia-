@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WeddingData, GuestInvitation, SongRequest } from '../types/wedding';
+import {
+  getSupabaseAccessToken,
+  insertSongRequestToSupabase,
+  updateSongRequestInSupabase,
+  deleteSongRequestFromSupabase
+} from '../services/supabaseService';
 import {
   Users,
   CheckCircle2,
@@ -67,10 +73,20 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const [geminiCsvReport, setGeminiCsvReport] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // DJ Celebration Playlist State (Starts completely empty)
+  // DJ Celebration Playlist State
   const [songList, setSongList] = useState<SongRequest[]>(
     wedding.songRequests || []
   );
+
+  useEffect(() => {
+    setSongList(wedding.songRequests || []);
+  }, [wedding.songRequests]);
+
+  const sanitizeCsvCell = (value: unknown): string => {
+    const str = String(value ?? '').replace(/"/g, '""');
+    const safe = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+    return `"${safe}"`;
+  };
   const [songFilter, setSongFilter] = useState<'all' | 'must-play' | 'approved' | 'pending' | 'declined'>('all');
   const [isAiDjLoading, setIsAiDjLoading] = useState(false);
   const [aiDjCuratorAdvice, setAiDjCuratorAdvice] = useState<string | null>(null);
@@ -221,9 +237,13 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const handleExportCSV = async () => {
     setIsExportingCsv(true);
     try {
+      const token = await getSupabaseAccessToken();
       const res = await fetch('/api/ai/export-csv', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           guests,
           weddingTitle: `${wedding.partner1} & ${wedding.partner2}`
@@ -257,7 +277,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
       setIsExportingCsv(false);
     }
 
-    // Direct real-time CSV fallback
+    // Direct real-time CSV fallback (sanitized)
     const headers = [
       'Pass ID',
       'Guest Full Name',
@@ -271,26 +291,26 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
     const rows = guests.map((g) => {
       const isCouple = g.attendanceType === 'couple' || g.hasPlusOne;
       return [
-        g.id,
-        `"${g.fullName}"`,
+        sanitizeCsvCell(g.id),
+        sanitizeCsvCell(g.fullName),
         isCouple ? 'Couple' : 'Single',
         isCouple ? '2' : '1',
-        g.status,
-        `"${g.dietaryRequirements || ''}"`,
+        sanitizeCsvCell(g.status),
+        sanitizeCsvCell(g.dietaryRequirements || ''),
         g.checkedIn ? 'Yes' : 'No',
-        g.checkedInAt || ''
+        sanitizeCsvCell(g.checkedInAt || '')
       ];
     });
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.href = url;
     link.setAttribute('download', `${wedding.slug}_realtime_guest_roster.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // DJ Playlist Management Handlers
@@ -300,6 +320,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   ) => {
     const updated = songList.map((s) => (s.id === songId ? { ...s, status } : s));
     setSongList(updated);
+    const modifiedSong = updated.find((s) => s.id === songId);
+    if (modifiedSong) {
+      void updateSongRequestInSupabase(modifiedSong);
+    }
     if (onUpdateWedding) {
       onUpdateWedding({ ...wedding, songRequests: updated });
     }
@@ -310,6 +334,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const handleDeleteSong = (songId: string) => {
     const updated = songList.filter((s) => s.id !== songId);
     setSongList(updated);
+    void deleteSongRequestFromSupabase(songId);
     if (onUpdateWedding) {
       onUpdateWedding({ ...wedding, songRequests: updated });
     }
@@ -318,6 +343,10 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const handleUpdateSongNotes = (songId: string, djNotes: string) => {
     const updated = songList.map((s) => (s.id === songId ? { ...s, djNotes } : s));
     setSongList(updated);
+    const modifiedSong = updated.find((s) => s.id === songId);
+    if (modifiedSong) {
+      void updateSongRequestInSupabase(modifiedSong);
+    }
     if (onUpdateWedding) {
       onUpdateWedding({ ...wedding, songRequests: updated });
     }
@@ -338,6 +367,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
 
     const updated = [newSong, ...songList];
     setSongList(updated);
+    void insertSongRequestToSupabase(newSong, wedding.id);
     if (onUpdateWedding) {
       onUpdateWedding({ ...wedding, songRequests: updated });
     }
@@ -353,10 +383,15 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
     setIsAiDjLoading(true);
     setAiDjCuratorAdvice(null);
     try {
+      const token = await getSupabaseAccessToken();
       const res = await fetch('/api/ai/dj-playlist', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
+          coupleNames: `${wedding.partner1} & ${wedding.partner2}`,
           weddingContext: {
             partner1: wedding.partner1,
             partner2: wedding.partner2,
@@ -367,7 +402,7 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
         })
       });
       const data = await res.json();
-      if (data.setflow || data.plan) {
+      if (res.ok && (data.setflow || data.plan)) {
         setAiDjCuratorAdvice(data.setflow || data.plan);
       } else {
         setAiDjCuratorAdvice(
@@ -386,23 +421,23 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   const handleExportDjCSV = () => {
     const headers = ['Track Title', 'Artist', 'Requested By', 'Status for DJ', 'Energy Level', 'DJ Special Cue Notes'];
     const rows = songList.map((s) => [
-      `"${s.songTitle}"`,
-      `"${s.artist}"`,
-      `"${s.guestName}"`,
-      s.status || 'approved',
-      s.danceEnergy || 'high-energy',
-      `"${s.djNotes || ''}"`
+      sanitizeCsvCell(s.songTitle),
+      sanitizeCsvCell(s.artist),
+      sanitizeCsvCell(s.guestName),
+      sanitizeCsvCell(s.status || 'approved'),
+      sanitizeCsvCell(s.danceEnergy || 'high-energy'),
+      sanitizeCsvCell(s.djNotes || '')
     ]);
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.href = url;
     link.setAttribute('download', `${wedding.slug}_dj_celebration_playlist.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleConfirmDelete = () => {

@@ -1,6 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WeddingData } from '../types/wedding';
-import { Lock, ShieldCheck, Heart, KeyRound, AlertCircle, X, Check } from 'lucide-react';
+import {
+  Lock,
+  ShieldCheck,
+  KeyRound,
+  AlertCircle,
+  X,
+  Check,
+  Users,
+  Loader2
+} from 'lucide-react';
+import {
+  getCoupleAuthStatus,
+  signInCoupleAdmin,
+  claimCoupleAdminPasscode
+} from '../services/supabaseService';
 
 interface CoupleAuthModalProps {
   wedding: WeddingData;
@@ -15,14 +29,29 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
   onClose,
   onAuthenticated
 }) => {
-  const [credentialInput, setCredentialInput] = useState('');
-  const [passcode, setPasscode] = useState('');
+  const [coupleNames, setCoupleNames] = useState('');
+  const [password, setPassword] = useState('');
+  const [requiresSetup, setRequiresSetup] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setError(null);
+    void getCoupleAuthStatus().then((status) => {
+      if (active) {
+        setRequiresSetup(status.requiresSetup);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Expected names
   const p1First = wedding.partner1.split(' ')[0] || wedding.partner1;
   const p2First = wedding.partner2.split(' ')[0] || wedding.partner2;
 
@@ -30,64 +59,40 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    const inputClean = credentialInput.trim().toLowerCase();
-    const p1Clean = p1First.toLowerCase();
-    const p2Clean = p2First.toLowerCase();
+    if (!coupleNames.trim() || !password) {
+      setError('Please enter both fields to continue.');
+      return;
+    }
 
-    // Check if input matches both first names
-    const matchesCoupleNames =
-      (inputClean.includes(p1Clean) && inputClean.includes(p2Clean)) ||
-      inputClean === `${p1Clean} & ${p2Clean}` ||
-      inputClean === `${p1Clean} and ${p2Clean}`;
-
+    setIsSubmitting(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          credential: credentialInput,
-          passcode,
-          partner1: p1First,
-          partner2: p2First
-        })
-      });
+      const result = requiresSetup
+        ? await claimCoupleAdminPasscode(coupleNames, password)
+        : await signInCoupleAdmin(coupleNames, password);
 
-      const data = await res.json();
-      if (res.ok && data.authenticated) {
-        if (data.sessionToken) {
-          try {
-            sessionStorage.setItem('aurelia_couple_token', data.sessionToken);
-          } catch {
-            // ignore
-          }
-        }
-        setIsSuccess(true);
-        setTimeout(() => {
-          onAuthenticated();
-          onClose();
-          setIsSuccess(false);
-        }, 700);
+      if (result.requiresSetup) {
+        setRequiresSetup(true);
+        setError('Admin password is not configured yet. Please set a password below.');
         return;
       }
 
-      setError(data.error || 'Invalid credentials or PIN passcode.');
-    } catch {
-      // Offline / client-only fallback
-      const validPasscode = passcode.trim() === '2026';
-      if (matchesCoupleNames && validPasscode) {
+      if (result.authenticated) {
         setIsSuccess(true);
         setTimeout(() => {
           onAuthenticated();
           onClose();
           setIsSuccess(false);
-        }, 700);
-      } else if (!matchesCoupleNames) {
-        setError(
-          `Invalid couple credential. Please enter both partner first names (${p1First} & ${p2First}).`
-        );
-      } else {
-        setError('Invalid PIN passcode. Please enter the valid administrative PIN.');
+          setCoupleNames('');
+          setPassword('');
+        }, 450);
+        return;
       }
+
+      setError(result.error || 'Invalid couple credentials or password.');
+    } catch {
+      setError('Unable to reach authentication service. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -95,6 +100,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
     <div className="fixed inset-0 z-50 bg-[#1C1B18]/80 backdrop-blur-md flex items-center justify-center p-4">
       <div className="bg-[#FAF7F0] rounded-sm max-w-md w-full shadow-2xl p-6 sm:p-8 relative">
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-neutral-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           title="Close modal"
@@ -110,10 +116,12 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
             Couple Restricted Area
           </span>
           <h2 className="font-editorial text-2xl sm:text-3xl font-normal text-[#292722]">
-            Couple Admin Sign In
+            {requiresSetup ? 'Initial Admin Setup' : 'Couple Admin Sign In'}
           </h2>
           <p className="text-xs text-[#5A554E] mt-1.5 leading-relaxed">
-            Restricted to the couple. Sign in to customize invitation stationery, confirm or decline guests &amp; plus-ones, curate the DJ playlist, or manage your wedding data.
+            {requiresSetup
+              ? 'Claim administrative control by verifying the couple names and setting your admin password.'
+              : 'Restricted to the couple. Enter your authorized couple credentials and password to unlock management access.'}
           </p>
         </div>
 
@@ -133,31 +141,42 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-              Assigned Couple Credential <span className="text-[#8C6D45]">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={credentialInput}
-              onChange={(e) => setCredentialInput(e.target.value)}
-              placeholder={`${p1First} & ${p2First}`}
-              className="w-full px-3.5 py-3 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold uppercase tracking-wider text-[#292722] mb-1.5">
-              Admin Passcode / PIN <span className="text-[#8C6D45]">*</span>
+            <label
+              htmlFor="couple-admin-names"
+              className="block font-semibold uppercase tracking-wider text-[#292722] mb-1.5"
+            >
+              Couple Names <span className="text-[#8C6D45]">*</span>
             </label>
             <div className="relative">
               <input
+                id="couple-admin-names"
+                type="text"
+                required
+                autoComplete="off"
+                value={coupleNames}
+                onChange={(e) => setCoupleNames(e.target.value)}
+                className="w-full px-3.5 py-3 pr-10 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
+              />
+              <Users className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3.5 opacity-60" />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="couple-admin-password"
+              className="block font-semibold uppercase tracking-wider text-[#292722] mb-1.5"
+            >
+              Password <span className="text-[#8C6D45]">*</span>
+            </label>
+            <div className="relative">
+              <input
+                id="couple-admin-password"
                 type="password"
                 required
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Enter PIN passcode"
-                className="w-full px-3.5 py-3 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
+                autoComplete={requiresSetup ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3.5 py-3 pr-10 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
               />
               <KeyRound className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3.5 opacity-60" />
             </div>
@@ -166,16 +185,27 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3.5 bg-[#292722] hover:bg-[#8C6D45] text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors shadow-sm flex items-center justify-center gap-2 min-h-[44px]"
+              disabled={isSubmitting}
+              className="w-full py-3.5 bg-[#292722] hover:bg-[#8C6D45] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider rounded-xs transition-colors shadow-sm flex items-center justify-center gap-2 min-h-[44px]"
             >
-              <ShieldCheck className="w-4 h-4 text-[#B59A72]" />
-              <span>Sign In as Couple Admin</span>
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 text-[#B59A72] animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 text-[#B59A72]" />
+              )}
+              <span>
+                {isSubmitting
+                  ? 'Verifying...'
+                  : requiresSetup
+                  ? 'Set Password & Unlock'
+                  : 'Sign In as Couple Admin'}
+              </span>
             </button>
           </div>
         </form>
 
         <div className="mt-5 pt-4 text-center text-[11px] text-neutral-500">
-          Guests do not require credentials — guests can access the wedding microsite and book/generate invitations freely.
+          Guests do not require credentials — guests can access the wedding microsite and RSVP freely.
         </div>
       </div>
     </div>
