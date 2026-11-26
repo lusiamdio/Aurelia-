@@ -6,6 +6,12 @@ const DEFAULT_WEDDING_ID = 'wed-aur-001';
 
 // Held strictly in JS/React memory (never written to localStorage or sessionStorage)
 let inMemoryAdminToken: string | null = null;
+let authTransportMode: 'api' | 'supabase_rpc' = 'api';
+
+function isJsonApiResponse(res: Response): boolean {
+  const contentType = res.headers.get('content-type') || '';
+  return contentType.includes('application/json') && res.status !== 404 && res.status !== 405 && res.status < 500;
+}
 
 function isMissingTableError(error: any): boolean {
   if (!error) return false;
@@ -154,24 +160,81 @@ export async function getCoupleAuthStatus(): Promise<{
 }> {
   try {
     const res = await fetch('/api/auth/status');
-    const contentType = res.headers.get('content-type') || '';
-    if (!res.ok || !contentType.includes('application/json')) {
-      return { passcodeConfigured: true, requiresSetup: false };
+    if (res.ok && isJsonApiResponse(res)) {
+      authTransportMode = 'api';
+      const data = await res.json();
+      return {
+        passcodeConfigured: Boolean(data.passcodeConfigured),
+        requiresSetup: Boolean(data.requiresSetup)
+      };
     }
-    const data = await res.json();
-    return {
-      passcodeConfigured: Boolean(data.passcodeConfigured),
-      requiresSetup: Boolean(data.requiresSetup)
-    };
   } catch {
-    return { passcodeConfigured: true, requiresSetup: false };
+    // fall through to Supabase RPC check
   }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.rpc('has_couple_admin_credentials', {
+        p_wedding_id: DEFAULT_WEDDING_ID
+      });
+      if (!error) {
+        authTransportMode = 'supabase_rpc';
+        return {
+          passcodeConfigured: Boolean(data),
+          requiresSetup: !Boolean(data)
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return { passcodeConfigured: true, requiresSetup: false };
+}
+
+async function signInViaSupabaseRpc(email: string, password: string): Promise<AuthResult> {
+  if (!supabase) {
+    return {
+      authenticated: false,
+      error: 'Authentication backend and Supabase client are not configured on this deployment.'
+    };
+  }
+
+  const { data, error } = await supabase.rpc('admin_sign_in', {
+    p_wedding_id: DEFAULT_WEDDING_ID,
+    p_email: email.trim().toLowerCase(),
+    p_password: password.trim()
+  });
+
+  if (error) {
+    return {
+      authenticated: false,
+      error:
+        'Please run the latest Supabase SQL schema script (admin_sign_in) or start the server with npm start.'
+    };
+  }
+
+  if (data?.authenticated && data?.accessToken) {
+    inMemoryAdminToken = String(data.accessToken);
+    authTransportMode = 'supabase_rpc';
+    return { authenticated: true };
+  }
+
+  return {
+    authenticated: false,
+    requiresSetup: Boolean(data?.requiresSetup),
+    error: data?.error || 'Invalid email or password.'
+  };
 }
 
 export async function signInCoupleAdmin(
   email: string,
   password: string
 ): Promise<AuthResult> {
+  if (authTransportMode === 'supabase_rpc') {
+    return signInViaSupabaseRpc(email, password);
+  }
+
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -182,15 +245,11 @@ export async function signInCoupleAdmin(
       })
     });
 
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json') || res.status === 404 || res.status === 405 || res.status >= 500) {
-      return {
-        authenticated: false,
-        error:
-          'Authentication backend is not reachable on this deployment. Start the server with npm start and verify environment settings.'
-      };
+    if (!isJsonApiResponse(res)) {
+      return signInViaSupabaseRpc(email, password);
     }
 
+    authTransportMode = 'api';
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.authenticated && data.accessToken) {
       inMemoryAdminToken = String(data.accessToken);
@@ -203,10 +262,7 @@ export async function signInCoupleAdmin(
       error: data.error || 'Invalid email or password.'
     };
   } catch {
-    return {
-      authenticated: false,
-      error: 'Unable to connect to authentication backend. Please try again.'
-    };
+    return signInViaSupabaseRpc(email, password);
   }
 }
 
@@ -214,44 +270,62 @@ export async function claimCoupleAdminPasscode(
   email: string,
   password: string
 ): Promise<AuthResult> {
-  try {
-    const res = await fetch('/api/auth/claim', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password
-      })
-    });
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch('/api/auth/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password
+        })
+      });
 
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json') || res.status === 404 || res.status === 405 || res.status >= 500) {
-      return {
-        authenticated: false,
-        error:
-          'Authentication backend is not reachable on this deployment. Start the server with npm start.'
-      };
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.authenticated && data.accessToken) {
+          inMemoryAdminToken = String(data.accessToken);
+          authTransportMode = 'api';
+          return { authenticated: true };
+        }
+        return {
+          authenticated: false,
+          error: data.error || 'Unable to complete initial setup.'
+        };
+      }
+    } catch {
+      // fall through to Supabase RPC claim
     }
-
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.authenticated && data.accessToken) {
-      inMemoryAdminToken = String(data.accessToken);
-      return { authenticated: true };
-    }
-
-    return {
-      authenticated: false,
-      error: data.error || 'Unable to complete initial setup.'
-    };
-  } catch {
-    return {
-      authenticated: false,
-      error: 'Unable to connect to authentication backend. Please try again.'
-    };
   }
+
+  if (supabase) {
+    const { data: claimed, error: claimErr } = await supabase.rpc('claim_couple_admin_password', {
+      p_wedding_id: DEFAULT_WEDDING_ID,
+      p_email: email.trim().toLowerCase(),
+      p_password: password.trim()
+    });
+    if (!claimErr && claimed) {
+      return signInViaSupabaseRpc(email, password);
+    }
+    if (!claimErr && !claimed) {
+      return { authenticated: false, error: 'Admin access is already configured.' };
+    }
+  }
+
+  return {
+    authenticated: false,
+    error: 'Unable to complete initial setup on this deployment.'
+  };
 }
 
 export async function signOutAdminFromSupabase(): Promise<void> {
+  if (authTransportMode === 'supabase_rpc' && inMemoryAdminToken && supabase) {
+    try {
+      await supabase.rpc('admin_sign_out', { p_token: inMemoryAdminToken });
+    } catch {
+      // ignore
+    }
+  }
   inMemoryAdminToken = null;
 }
 
@@ -263,11 +337,28 @@ export async function getCurrentAdminSession(): Promise<{
   isAdmin: boolean;
 }> {
   if (!inMemoryAdminToken) return { isAdmin: false };
+
+  if (authTransportMode === 'supabase_rpc' && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('admin_verify_session', {
+        p_token: inMemoryAdminToken,
+        p_wedding_id: DEFAULT_WEDDING_ID
+      });
+      if (error || !data) {
+        inMemoryAdminToken = null;
+        return { isAdmin: false };
+      }
+      return { isAdmin: true };
+    } catch {
+      return { isAdmin: false };
+    }
+  }
+
   try {
     const res = await fetch('/api/auth/session', {
       headers: { Authorization: `Bearer ${inMemoryAdminToken}` }
     });
-    if (!res.ok) {
+    if (!res.ok || !isJsonApiResponse(res)) {
       inMemoryAdminToken = null;
       return { isAdmin: false };
     }
@@ -459,18 +550,34 @@ export async function saveWeddingToSupabase(wedding: WeddingData): Promise<{ err
     sort_order: idx + 1
   }));
 
-  try {
-    const res = await fetch('/api/admin/wedding', {
-      method: 'PUT',
-      headers: adminAuthHeaders(),
-      body: JSON.stringify({ weddingPayload, eventRows })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error || 'Failed to save wedding settings.' };
-    return {};
-  } catch (err: any) {
-    return { error: err?.message || 'Network error saving wedding.' };
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch('/api/admin/wedding', {
+        method: 'PUT',
+        headers: adminAuthHeaders(),
+        body: JSON.stringify({ weddingPayload, eventRows })
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error || 'Failed to save wedding settings.' };
+        return {};
+      }
+    } catch {
+      // fall through to Supabase RPC
+    }
   }
+
+  if (supabase) {
+    const { error } = await supabase.rpc('admin_save_wedding', {
+      p_token: inMemoryAdminToken,
+      p_wedding: weddingPayload,
+      p_events: eventRows
+    });
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Unable to save wedding settings.' };
 }
 
 export async function fetchGuestsFromSupabase(weddingId = DEFAULT_WEDDING_ID): Promise<{
@@ -479,18 +586,33 @@ export async function fetchGuestsFromSupabase(weddingId = DEFAULT_WEDDING_ID): P
 }> {
   if (!inMemoryAdminToken) return { guests: null, error: 'Admin authentication required' };
 
-  try {
-    const res = await fetch(`/api/admin/guests?weddingId=${encodeURIComponent(weddingId)}`, {
-      headers: adminAuthHeaders()
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !Array.isArray(data.guests)) {
-      return { guests: null, error: data.error };
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch(`/api/admin/guests?weddingId=${encodeURIComponent(weddingId)}`, {
+        headers: adminAuthHeaders()
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(data.guests)) {
+          return { guests: null, error: data.error };
+        }
+        return { guests: data.guests.map(mapGuestFromRow) };
+      }
+    } catch {
+      // fall through to Supabase RPC
     }
-    return { guests: data.guests.map(mapGuestFromRow) };
-  } catch (err: any) {
-    return { guests: null, error: err?.message || 'Failed to load guests.' };
   }
+
+  if (supabase) {
+    const { data, error } = await supabase.rpc('admin_list_guests', {
+      p_token: inMemoryAdminToken,
+      p_wedding_id: weddingId
+    });
+    if (error) return { guests: null, error: error.message };
+    return { guests: Array.isArray(data) ? data.map(mapGuestFromRow) : [] };
+  }
+
+  return { guests: null, error: 'Failed to load guests.' };
 }
 
 export async function insertGuestToSupabase(
@@ -500,17 +622,30 @@ export async function insertGuestToSupabase(
   const row = mapGuestToRow(guest, weddingId);
 
   if (inMemoryAdminToken) {
-    try {
-      const res = await fetch('/api/admin/guests', {
-        method: 'POST',
-        headers: adminAuthHeaders(),
-        body: JSON.stringify(row)
+    if (authTransportMode !== 'supabase_rpc') {
+      try {
+        const res = await fetch('/api/admin/guests', {
+          method: 'POST',
+          headers: adminAuthHeaders(),
+          body: JSON.stringify(row)
+        });
+        if (isJsonApiResponse(res)) {
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return { error: data.error };
+          return {};
+        }
+      } catch {
+        // fall through to Supabase RPC
+      }
+    }
+
+    if (supabase) {
+      const { error } = await supabase.rpc('admin_upsert_guest', {
+        p_token: inMemoryAdminToken,
+        p_guest: row
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return { error: data.error };
+      if (error) return { error: error.message };
       return {};
-    } catch (err: any) {
-      return { error: err?.message };
     }
   }
 
@@ -520,17 +655,24 @@ export async function insertGuestToSupabase(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(row)
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error || 'Failed to register RSVP.' };
-    return {};
-  } catch (err: any) {
-    if (supabase) {
-      const { error } = await supabase.from('guest_invitations').insert(row);
-      if (error) return { error: error.message };
+    if (isJsonApiResponse(res)) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: data.error || 'Failed to register RSVP.' };
       return {};
     }
-    return { error: err?.message || 'Failed to register RSVP.' };
+  } catch {
+    // fall through to Supabase public RSVP RPC
   }
+
+  if (supabase) {
+    const { data, error } = await supabase.rpc('submit_guest_rsvp', { p_guest: row });
+    if (!error && data?.ok) return {};
+    const { error: insertErr } = await supabase.from('guest_invitations').insert(row);
+    if (insertErr) return { error: insertErr.message };
+    return {};
+  }
+
+  return { error: 'Failed to register RSVP.' };
 }
 
 export async function updateGuestInSupabase(
@@ -540,34 +682,65 @@ export async function updateGuestInSupabase(
   if (!inMemoryAdminToken) return { error: 'Admin authentication required' };
 
   const row = mapGuestToRow(guest, weddingId);
-  try {
-    const res = await fetch(`/api/admin/guests/${encodeURIComponent(guest.id)}`, {
-      method: 'PATCH',
-      headers: adminAuthHeaders(),
-      body: JSON.stringify(row)
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error };
-    return {};
-  } catch (err: any) {
-    return { error: err?.message };
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch(`/api/admin/guests/${encodeURIComponent(guest.id)}`, {
+        method: 'PATCH',
+        headers: adminAuthHeaders(),
+        body: JSON.stringify(row)
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through to Supabase RPC
+    }
   }
+
+  if (supabase) {
+    const { error } = await supabase.rpc('admin_upsert_guest', {
+      p_token: inMemoryAdminToken,
+      p_guest: row
+    });
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Failed to update guest.' };
 }
 
 export async function deleteGuestFromSupabase(guestId: string): Promise<{ error?: string }> {
   if (!inMemoryAdminToken) return { error: 'Admin authentication required' };
 
-  try {
-    const res = await fetch(`/api/admin/guests/${encodeURIComponent(guestId)}`, {
-      method: 'DELETE',
-      headers: adminAuthHeaders()
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error };
-    return {};
-  } catch (err: any) {
-    return { error: err?.message };
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch(`/api/admin/guests/${encodeURIComponent(guestId)}`, {
+        method: 'DELETE',
+        headers: adminAuthHeaders()
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through to Supabase RPC
+    }
   }
+
+  if (supabase) {
+    const { error } = await supabase.rpc('admin_delete_guest', {
+      p_token: inMemoryAdminToken,
+      p_wedding_id: DEFAULT_WEDDING_ID,
+      p_guest_id: guestId
+    });
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Failed to delete guest.' };
 }
 
 export async function insertSongRequestToSupabase(
@@ -588,76 +761,120 @@ export async function insertSongRequestToSupabase(
     votes: song.votes ?? 1
   };
 
-  if (inMemoryAdminToken) {
+  if (inMemoryAdminToken && authTransportMode !== 'supabase_rpc') {
     try {
       const res = await fetch('/api/admin/songs', {
         method: 'POST',
         headers: adminAuthHeaders(),
         body: JSON.stringify(row)
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return { error: data.error };
-      return {};
-    } catch (err: any) {
-      return { error: err?.message };
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through
     }
   }
 
-  try {
-    const res = await fetch('/api/public/songs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(row)
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error };
-    return {};
-  } catch (err: any) {
-    if (supabase) {
-      const { error } = await supabase.from('song_requests').insert(row);
-      if (error) return { error: error.message };
-      return {};
+  if (!inMemoryAdminToken) {
+    try {
+      const res = await fetch('/api/public/songs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row)
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through
     }
-    return { error: err?.message };
   }
+
+  if (supabase) {
+    const { error } = await supabase.from('song_requests').insert(row);
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Failed to submit song request.' };
 }
 
 export async function updateSongRequestInSupabase(song: SongRequest): Promise<{ error?: string }> {
   if (!inMemoryAdminToken) return { error: 'Admin authentication required' };
 
-  try {
-    const res = await fetch(`/api/admin/songs/${encodeURIComponent(song.id)}`, {
-      method: 'PATCH',
-      headers: adminAuthHeaders(),
-      body: JSON.stringify({
-        status: song.status || 'pending',
-        dj_notes: song.djNotes || null,
-        notes: song.notes || null,
-        dance_energy: song.danceEnergy || 'high-energy'
-      })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error };
-    return {};
-  } catch (err: any) {
-    return { error: err?.message };
+  const patch = {
+    status: song.status || 'pending',
+    dj_notes: song.djNotes || null,
+    notes: song.notes || null,
+    dance_energy: song.danceEnergy || 'high-energy'
+  };
+
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch(`/api/admin/songs/${encodeURIComponent(song.id)}`, {
+        method: 'PATCH',
+        headers: adminAuthHeaders(),
+        body: JSON.stringify(patch)
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through to Supabase RPC
+    }
   }
+
+  if (supabase) {
+    const { error } = await supabase.rpc('admin_update_song', {
+      p_token: inMemoryAdminToken,
+      p_wedding_id: DEFAULT_WEDDING_ID,
+      p_song_id: song.id,
+      p_patch: patch
+    });
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Failed to update song request.' };
 }
 
 export async function deleteSongRequestFromSupabase(songId: string): Promise<{ error?: string }> {
   if (!inMemoryAdminToken) return { error: 'Admin authentication required' };
 
-  try {
-    const res = await fetch(`/api/admin/songs/${encodeURIComponent(songId)}`, {
-      method: 'DELETE',
-      headers: adminAuthHeaders()
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error };
-    return {};
-  } catch (err: any) {
-    return { error: err?.message };
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch(`/api/admin/songs/${encodeURIComponent(songId)}`, {
+        method: 'DELETE',
+        headers: adminAuthHeaders()
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through to Supabase RPC
+    }
   }
+
+  if (supabase) {
+    const { error } = await supabase.rpc('admin_delete_song', {
+      p_token: inMemoryAdminToken,
+      p_wedding_id: DEFAULT_WEDDING_ID,
+      p_song_id: songId
+    });
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Failed to delete song request.' };
 }
 
 export async function eraseWeddingDataFromSupabase(
@@ -665,17 +882,32 @@ export async function eraseWeddingDataFromSupabase(
 ): Promise<{ error?: string }> {
   if (!inMemoryAdminToken) return { error: 'Admin authentication required' };
 
-  try {
-    const res = await fetch(`/api/admin/erase/${encodeURIComponent(weddingId)}`, {
-      method: 'DELETE',
-      headers: adminAuthHeaders()
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error };
-    return {};
-  } catch (err: any) {
-    return { error: err?.message };
+  if (authTransportMode !== 'supabase_rpc') {
+    try {
+      const res = await fetch(`/api/admin/erase/${encodeURIComponent(weddingId)}`, {
+        method: 'DELETE',
+        headers: adminAuthHeaders()
+      });
+      if (isJsonApiResponse(res)) {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: data.error };
+        return {};
+      }
+    } catch {
+      // fall through to Supabase RPC
+    }
   }
+
+  if (supabase) {
+    const { error } = await supabase.rpc('admin_erase_wedding', {
+      p_token: inMemoryAdminToken,
+      p_wedding_id: weddingId
+    });
+    if (error) return { error: error.message };
+    return {};
+  }
+
+  return { error: 'Failed to erase wedding data.' };
 }
 
 export type AdminSyncTopic = 'guests' | 'songs' | 'wedding';
@@ -689,7 +921,7 @@ export function subscribeToAdminRealTimeSync(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   const connectStream = async () => {
-    if (isDisposed || !inMemoryAdminToken) return;
+    if (isDisposed || !inMemoryAdminToken || authTransportMode === 'supabase_rpc') return;
 
     controller = new AbortController();
     try {
@@ -705,7 +937,8 @@ export function subscribeToAdminRealTimeSync(
         }
       );
 
-      if (res.status === 401 || res.status === 403) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.status === 401 || res.status === 403 || res.status === 404 || !contentType.includes('text/event-stream')) {
         return;
       }
 

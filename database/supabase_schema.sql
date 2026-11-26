@@ -322,6 +322,491 @@ GRANT EXECUTE ON FUNCTION public.verify_couple_admin_login(TEXT, TEXT, TEXT) TO 
 REVOKE ALL ON FUNCTION public.claim_couple_admin_password(TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_couple_admin_password(TEXT, TEXT, TEXT) TO anon, authenticated;
 
+-- 5C. COUPLE ADMIN SESSION TOKENS & PROTECTED RPCs (ENABLES FULL STATIC/SERVERLESS DEPLOYMENT)
+CREATE TABLE IF NOT EXISTS public.couple_admin_sessions (
+  token       TEXT PRIMARY KEY,
+  wedding_id  TEXT NOT NULL REFERENCES public.weddings(id) ON DELETE CASCADE,
+  admin_email TEXT NOT NULL,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.couple_admin_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.require_couple_admin_session(
+  p_token TEXT,
+  p_wedding_id TEXT DEFAULT 'wed-aur-001'
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  IF p_token IS NULL OR length(trim(p_token)) < 16 THEN
+    RETURN FALSE;
+  END IF;
+
+  DELETE FROM public.couple_admin_sessions WHERE expires_at <= now();
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.couple_admin_sessions
+    WHERE token = trim(p_token)
+      AND wedding_id = p_wedding_id
+      AND expires_at > now()
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_sign_in(
+  p_wedding_id TEXT DEFAULT 'wed-aur-001',
+  p_email TEXT DEFAULT '',
+  p_password TEXT DEFAULT ''
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_token TEXT;
+  v_clean_email TEXT := lower(trim(coalesce(p_email, '')));
+BEGIN
+  IF NOT public.has_couple_admin_credentials(p_wedding_id) THEN
+    RETURN jsonb_build_object(
+      'authenticated', false,
+      'requiresSetup', true,
+      'error', 'Admin credentials have not been configured yet.'
+    );
+  END IF;
+
+  IF NOT public.verify_couple_admin_login(p_wedding_id, v_clean_email, p_password) THEN
+    RETURN jsonb_build_object(
+      'authenticated', false,
+      'error', 'Invalid email or password.'
+    );
+  END IF;
+
+  v_token := encode(gen_random_bytes(32), 'hex');
+  INSERT INTO public.couple_admin_sessions (token, wedding_id, admin_email, expires_at)
+  VALUES (v_token, p_wedding_id, v_clean_email, now() + interval '12 hours');
+
+  RETURN jsonb_build_object(
+    'authenticated', true,
+    'role', 'couple_admin',
+    'accessToken', v_token
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_verify_session(
+  p_token TEXT,
+  p_wedding_id TEXT DEFAULT 'wed-aur-001'
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+  SELECT public.require_couple_admin_session(p_token, p_wedding_id);
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_sign_out(p_token TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  DELETE FROM public.couple_admin_sessions WHERE token = trim(coalesce(p_token, ''));
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.submit_guest_rsvp(p_guest JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_id TEXT := coalesce(nullif(trim(p_guest->>'id'), ''), 'AUR-' || floor(1000 + random() * 9000)::text);
+  v_wedding_id TEXT := coalesce(nullif(trim(p_guest->>'wedding_id'), ''), 'wed-aur-001');
+  v_name TEXT := left(trim(coalesce(p_guest->>'full_name', '')), 160);
+  v_status TEXT := CASE WHEN (p_guest->>'status') IN ('attending', 'declined', 'pending') THEN (p_guest->>'status') ELSE 'pending' END;
+  v_att_type TEXT := CASE WHEN (p_guest->>'attendance_type') = 'couple' THEN 'couple' ELSE 'single' END;
+  v_has_plus BOOLEAN := coalesce((p_guest->>'has_plus_one')::boolean, v_att_type = 'couple');
+  v_plus_status TEXT := CASE WHEN (p_guest->>'plus_one_status') IN ('confirmed', 'rejected', 'pending') THEN (p_guest->>'plus_one_status') WHEN v_has_plus THEN 'confirmed' ELSE 'pending' END;
+  v_sent_via TEXT := CASE WHEN (p_guest->>'invitation_sent_via') IN ('whatsapp', 'email', 'download') THEN (p_guest->>'invitation_sent_via') ELSE 'download' END;
+  v_events TEXT[];
+BEGIN
+  IF v_wedding_id <> 'wed-aur-001' OR length(v_name) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Full name is required.');
+  END IF;
+
+  SELECT coalesce(array_agg(elem), '{}')
+  INTO v_events
+  FROM jsonb_array_elements_text(coalesce(p_guest->'events_attending', '[]'::jsonb)) AS elem;
+
+  INSERT INTO public.guest_invitations (
+    id, wedding_id, full_name, email, phone, status, events_attending,
+    attendance_type, has_plus_one, plus_one_name, plus_one_dietary,
+    plus_one_status, plus_one_allowed, dietary_requirements,
+    invitation_sent_via, invitation_generated_at, checked_in, checked_in_at, notes
+  )
+  VALUES (
+    v_id,
+    v_wedding_id,
+    v_name,
+    nullif(trim(coalesce(p_guest->>'email', '')), ''),
+    nullif(trim(coalesce(p_guest->>'phone', '')), ''),
+    v_status,
+    v_events,
+    v_att_type,
+    v_has_plus,
+    nullif(trim(coalesce(p_guest->>'plus_one_name', '')), ''),
+    nullif(trim(coalesce(p_guest->>'plus_one_dietary', '')), ''),
+    v_plus_status,
+    coalesce((p_guest->>'plus_one_allowed')::boolean, v_has_plus),
+    nullif(trim(coalesce(p_guest->>'dietary_requirements', '')), ''),
+    v_sent_via,
+    coalesce(nullif(trim(p_guest->>'invitation_generated_at'), ''), to_char(now(), 'YYYY-MM-DD HH24:MI')),
+    coalesce((p_guest->>'checked_in')::boolean, false),
+    nullif(trim(coalesce(p_guest->>'checked_in_at', '')), ''),
+    nullif(trim(coalesce(p_guest->>'notes', '')), '')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
+    phone = EXCLUDED.phone,
+    status = EXCLUDED.status,
+    events_attending = EXCLUDED.events_attending,
+    attendance_type = EXCLUDED.attendance_type,
+    has_plus_one = EXCLUDED.has_plus_one,
+    plus_one_name = EXCLUDED.plus_one_name,
+    plus_one_dietary = EXCLUDED.plus_one_dietary,
+    plus_one_status = EXCLUDED.plus_one_status,
+    plus_one_allowed = EXCLUDED.plus_one_allowed,
+    dietary_requirements = EXCLUDED.dietary_requirements,
+    invitation_sent_via = EXCLUDED.invitation_sent_via,
+    notes = EXCLUDED.notes,
+    updated_at = now();
+
+  RETURN jsonb_build_object('ok', true, 'id', v_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_list_guests(
+  p_token TEXT,
+  p_wedding_id TEXT DEFAULT 'wed-aur-001'
+)
+RETURNS SETOF public.guest_invitations
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, p_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  RETURN QUERY
+  SELECT *
+  FROM public.guest_invitations
+  WHERE wedding_id = p_wedding_id
+  ORDER BY created_at DESC;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_upsert_guest(
+  p_token TEXT,
+  p_guest JSONB
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_id TEXT := coalesce(nullif(trim(p_guest->>'id'), ''), 'AUR-' || floor(1000 + random() * 9000)::text);
+  v_wedding_id TEXT := coalesce(nullif(trim(p_guest->>'wedding_id'), ''), 'wed-aur-001');
+  v_name TEXT := left(trim(coalesce(p_guest->>'full_name', '')), 160);
+  v_status TEXT := CASE WHEN (p_guest->>'status') IN ('attending', 'declined', 'pending') THEN (p_guest->>'status') ELSE 'pending' END;
+  v_att_type TEXT := CASE WHEN (p_guest->>'attendance_type') = 'couple' THEN 'couple' ELSE 'single' END;
+  v_has_plus BOOLEAN := coalesce((p_guest->>'has_plus_one')::boolean, v_att_type = 'couple');
+  v_plus_status TEXT := CASE WHEN (p_guest->>'plus_one_status') IN ('confirmed', 'rejected', 'pending') THEN (p_guest->>'plus_one_status') WHEN v_has_plus THEN 'confirmed' ELSE 'pending' END;
+  v_sent_via TEXT := CASE WHEN (p_guest->>'invitation_sent_via') IN ('whatsapp', 'email', 'download') THEN (p_guest->>'invitation_sent_via') ELSE 'download' END;
+  v_events TEXT[];
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, v_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF length(v_name) = 0 THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT coalesce(array_agg(elem), '{}')
+  INTO v_events
+  FROM jsonb_array_elements_text(coalesce(p_guest->'events_attending', '[]'::jsonb)) AS elem;
+
+  INSERT INTO public.guest_invitations (
+    id, wedding_id, full_name, email, phone, status, events_attending,
+    attendance_type, has_plus_one, plus_one_name, plus_one_dietary,
+    plus_one_status, plus_one_allowed, dietary_requirements,
+    invitation_sent_via, invitation_generated_at, checked_in, checked_in_at, notes
+  )
+  VALUES (
+    v_id,
+    v_wedding_id,
+    v_name,
+    nullif(trim(coalesce(p_guest->>'email', '')), ''),
+    nullif(trim(coalesce(p_guest->>'phone', '')), ''),
+    v_status,
+    v_events,
+    v_att_type,
+    v_has_plus,
+    nullif(trim(coalesce(p_guest->>'plus_one_name', '')), ''),
+    nullif(trim(coalesce(p_guest->>'plus_one_dietary', '')), ''),
+    v_plus_status,
+    coalesce((p_guest->>'plus_one_allowed')::boolean, v_has_plus),
+    nullif(trim(coalesce(p_guest->>'dietary_requirements', '')), ''),
+    v_sent_via,
+    coalesce(nullif(trim(p_guest->>'invitation_generated_at'), ''), to_char(now(), 'YYYY-MM-DD HH24:MI')),
+    coalesce((p_guest->>'checked_in')::boolean, false),
+    nullif(trim(coalesce(p_guest->>'checked_in_at', '')), ''),
+    nullif(trim(coalesce(p_guest->>'notes', '')), '')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
+    phone = EXCLUDED.phone,
+    status = EXCLUDED.status,
+    events_attending = EXCLUDED.events_attending,
+    attendance_type = EXCLUDED.attendance_type,
+    has_plus_one = EXCLUDED.has_plus_one,
+    plus_one_name = EXCLUDED.plus_one_name,
+    plus_one_dietary = EXCLUDED.plus_one_dietary,
+    plus_one_status = EXCLUDED.plus_one_status,
+    plus_one_allowed = EXCLUDED.plus_one_allowed,
+    dietary_requirements = EXCLUDED.dietary_requirements,
+    invitation_sent_via = EXCLUDED.invitation_sent_via,
+    checked_in = EXCLUDED.checked_in,
+    checked_in_at = EXCLUDED.checked_in_at,
+    notes = EXCLUDED.notes,
+    updated_at = now();
+
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_guest(
+  p_token TEXT,
+  p_wedding_id TEXT,
+  p_guest_id TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, p_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  DELETE FROM public.guest_invitations
+  WHERE id = p_guest_id AND wedding_id = p_wedding_id;
+
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_save_wedding(
+  p_token TEXT,
+  p_wedding JSONB,
+  p_events JSONB DEFAULT '[]'::jsonb
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_wedding_id TEXT := coalesce(nullif(trim(p_wedding->>'id'), ''), 'wed-aur-001');
+  v_evt JSONB;
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, v_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  UPDATE public.weddings SET
+    custom_domain = p_wedding->>'custom_domain',
+    partner1 = coalesce(nullif(p_wedding->>'partner1', ''), partner1),
+    partner2 = coalesce(nullif(p_wedding->>'partner2', ''), partner2),
+    display_date = coalesce(nullif(p_wedding->>'display_date', ''), display_date),
+    raw_date = coalesce(nullif(p_wedding->>'raw_date', '')::date, raw_date),
+    city = coalesce(nullif(p_wedding->>'city', ''), city),
+    venue = coalesce(nullif(p_wedding->>'venue', ''), venue),
+    headline = coalesce(nullif(p_wedding->>'headline', ''), headline),
+    story_title = coalesce(nullif(p_wedding->>'story_title', ''), story_title),
+    story_message = coalesce(nullif(p_wedding->>'story_message', ''), story_message),
+    story_paragraphs = coalesce(p_wedding->'story_paragraphs', story_paragraphs),
+    story_timeline = coalesce(p_wedding->'story_timeline', story_timeline),
+    dress_code_summary = coalesce(nullif(p_wedding->>'dress_code_summary', ''), dress_code_summary),
+    dress_code_church = coalesce(nullif(p_wedding->>'dress_code_church', ''), dress_code_church),
+    dress_code_dining = coalesce(nullif(p_wedding->>'dress_code_dining', ''), dress_code_dining),
+    scripture1 = p_wedding->>'scripture1',
+    scripture2 = p_wedding->>'scripture2',
+    hero_image = coalesce(nullif(p_wedding->>'hero_image', ''), hero_image),
+    rsvp_deadline = coalesce(nullif(p_wedding->>'rsvp_deadline', ''), rsvp_deadline),
+    gift_registry_url = p_wedding->>'gift_registry_url',
+    invitation_style = coalesce(nullif(p_wedding->>'invitation_style', ''), invitation_style),
+    foil_accent = coalesce(nullif(p_wedding->>'foil_accent', ''), foil_accent),
+    paper_tone = coalesce(nullif(p_wedding->>'paper_tone', ''), paper_tone),
+    monogram = coalesce(nullif(p_wedding->>'monogram', ''), monogram),
+    card_orientation = coalesce(nullif(p_wedding->>'card_orientation', ''), card_orientation),
+    selected_font_family = coalesce(nullif(p_wedding->>'selected_font_family', ''), selected_font_family),
+    couple_photo_url = p_wedding->>'couple_photo_url',
+    show_photo_on_card = coalesce((p_wedding->>'show_photo_on_card')::boolean, show_photo_on_card),
+    photo_frame_style = coalesce(nullif(p_wedding->>'photo_frame_style', ''), photo_frame_style),
+    decorative_graphic = coalesce(nullif(p_wedding->>'decorative_graphic', ''), decorative_graphic),
+    wax_seal_style = coalesce(nullif(p_wedding->>'wax_seal_style', ''), wax_seal_style),
+    custom_colors = coalesce(p_wedding->'custom_colors', custom_colors),
+    updated_at = now()
+  WHERE id = v_wedding_id;
+
+  IF jsonb_typeof(p_events) = 'array' THEN
+    FOR v_evt IN SELECT * FROM jsonb_array_elements(p_events)
+    LOOP
+      INSERT INTO public.wedding_events (
+        id, wedding_id, title, event_date, event_time, venue, address, dress_code, description, sort_order
+      )
+      VALUES (
+        v_evt->>'id',
+        v_wedding_id,
+        v_evt->>'title',
+        v_evt->>'event_date',
+        v_evt->>'event_time',
+        v_evt->>'venue',
+        v_evt->>'address',
+        v_evt->>'dress_code',
+        coalesce(v_evt->>'description', ''),
+        coalesce((v_evt->>'sort_order')::smallint, 0)
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        event_date = EXCLUDED.event_date,
+        event_time = EXCLUDED.event_time,
+        venue = EXCLUDED.venue,
+        address = EXCLUDED.address,
+        dress_code = EXCLUDED.dress_code,
+        description = EXCLUDED.description,
+        sort_order = EXCLUDED.sort_order,
+        updated_at = now();
+    END LOOP;
+  END IF;
+
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_update_song(
+  p_token TEXT,
+  p_wedding_id TEXT,
+  p_song_id TEXT,
+  p_patch JSONB
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, p_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  UPDATE public.song_requests SET
+    status = coalesce(nullif(p_patch->>'status', ''), status),
+    dj_notes = p_patch->>'dj_notes',
+    notes = p_patch->>'notes',
+    dance_energy = coalesce(nullif(p_patch->>'dance_energy', ''), dance_energy)
+  WHERE id = p_song_id AND wedding_id = p_wedding_id;
+
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_song(
+  p_token TEXT,
+  p_wedding_id TEXT,
+  p_song_id TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, p_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  DELETE FROM public.song_requests
+  WHERE id = p_song_id AND wedding_id = p_wedding_id;
+
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_erase_wedding(
+  p_token TEXT,
+  p_wedding_id TEXT DEFAULT 'wed-aur-001'
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+BEGIN
+  IF NOT public.require_couple_admin_session(p_token, p_wedding_id) THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  DELETE FROM public.guest_invitations WHERE wedding_id = p_wedding_id;
+  DELETE FROM public.song_requests WHERE wedding_id = p_wedding_id;
+
+  RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.require_couple_admin_session(TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_sign_in(TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_verify_session(TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_sign_out(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.submit_guest_rsvp(JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_list_guests(TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_upsert_guest(TEXT, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_delete_guest(TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_save_wedding(TEXT, JSONB, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_update_song(TEXT, TEXT, TEXT, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_delete_song(TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_erase_wedding(TEXT, TEXT) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.admin_sign_in(TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_verify_session(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_sign_out(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.submit_guest_rsvp(JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_list_guests(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_upsert_guest(TEXT, JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_guest(TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_save_wedding(TEXT, JSONB, JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_update_song(TEXT, TEXT, TEXT, JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_song(TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_erase_wedding(TEXT, TEXT) TO anon, authenticated;
+
 -- 6. ROW-LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.weddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wedding_events ENABLE ROW LEVEL SECURITY;
