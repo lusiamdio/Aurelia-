@@ -7,7 +7,7 @@ import {
   AlertCircle,
   X,
   Check,
-  Users,
+  Mail,
   Loader2
 } from 'lucide-react';
 import {
@@ -29,7 +29,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
   onClose,
   onAuthenticated
 }) => {
-  const [coupleNames, setCoupleNames] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [requiresSetup, setRequiresSetup] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -67,7 +67,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    if (!coupleNames.trim() || !password) {
+    if (!email.trim() || !password) {
       setError('Please enter both fields to continue.');
       return;
     }
@@ -82,12 +82,12 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
       }
 
       const result = useSetupMode
-        ? await claimCoupleAdminPasscode(coupleNames, password)
-        : await signInCoupleAdmin(coupleNames, password);
+        ? await claimCoupleAdminPasscode(email, password)
+        : await signInCoupleAdmin(email, password);
 
       if (result.requiresSetup) {
         setRequiresSetup(true);
-        setError('Initial admin setup is required on this deployment. Click "Set Password & Unlock" to save your password.');
+        setError('Initial admin setup is required on this deployment. Click "Set Password & Unlock" to save your credentials.');
         return;
       }
 
@@ -97,13 +97,13 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
           onAuthenticated();
           onClose();
           setIsSuccess(false);
-          setCoupleNames('');
+          setEmail('');
           setPassword('');
         }, 450);
         return;
       }
 
-      setError(result.error || 'Invalid couple credentials or password.');
+      setError(result.error || 'Invalid email or password.');
     } catch {
       setError('Unable to reach authentication service. Please try again.');
     } finally {
@@ -135,8 +135,8 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
           </h2>
           <p className="text-xs text-[#5A554E] mt-1.5 leading-relaxed">
             {requiresSetup
-              ? 'Claim administrative control by verifying the couple names and setting your admin password.'
-              : 'Restricted to the couple. Enter your authorized couple credentials and password to unlock management access.'}
+              ? 'Claim administrative control by entering the authorized admin email and password.'
+              : 'Restricted to the couple. Enter your authorized email and password to unlock management access.'}
           </p>
         </div>
 
@@ -157,22 +157,22 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
             <label
-              htmlFor="couple-admin-names"
+              htmlFor="couple-admin-email"
               className="block font-semibold uppercase tracking-wider text-[#292722] mb-1.5"
             >
-              Couple Names <span className="text-[#8C6D45]">*</span>
+              Email <span className="text-[#8C6D45]">*</span>
             </label>
             <div className="relative">
               <input
-                id="couple-admin-names"
-                type="text"
+                id="couple-admin-email"
+                type="email"
                 required
-                autoComplete="off"
-                value={coupleNames}
-                onChange={(e) => setCoupleNames(e.target.value)}
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3.5 py-3 pr-10 text-sm bg-white rounded-xs text-[#292722] shadow-xs focus:outline-hidden focus:ring-1 focus:ring-[#8C6D45]"
               />
-              <Users className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3.5 opacity-60" />
+              <Mail className="w-4 h-4 text-[#8C6D45] absolute right-3 top-3.5 opacity-60" />
             </div>
           </div>
 

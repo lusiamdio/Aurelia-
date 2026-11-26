@@ -215,16 +215,23 @@ $$;
 REVOKE ALL ON FUNCTION public.claim_couple_admin_access(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_couple_admin_access(TEXT) TO authenticated;
 
--- 5B. COUPLE ADMIN CREDENTIAL VERIFICATION (PGCRYPTO HASHED, RLS-LOCKED)
+-- 5B. COUPLE ADMIN CREDENTIAL VERIFICATION (EMAIL + PGCRYPTO HASHED, RLS-LOCKED)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS public.couple_admin_credentials (
   wedding_id    TEXT PRIMARY KEY REFERENCES public.weddings(id) ON DELETE CASCADE,
+  admin_email   TEXT NOT NULL,
   passcode_hash TEXT NOT NULL,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.couple_admin_credentials
+  ADD COLUMN IF NOT EXISTS admin_email TEXT;
+
 ALTER TABLE public.couple_admin_credentials ENABLE ROW LEVEL SECURITY;
+
+DROP FUNCTION IF EXISTS public.verify_couple_admin_login(TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.claim_couple_admin_password(TEXT, TEXT, TEXT);
 
 CREATE OR REPLACE FUNCTION public.has_couple_admin_credentials(p_wedding_id TEXT DEFAULT 'wed-aur-001')
 RETURNS BOOLEAN
@@ -234,13 +241,17 @@ SECURITY DEFINER
 SET search_path = public, extensions
 AS $$
   SELECT EXISTS (
-    SELECT 1 FROM public.couple_admin_credentials WHERE wedding_id = p_wedding_id
+    SELECT 1
+    FROM public.couple_admin_credentials
+    WHERE wedding_id = p_wedding_id
+      AND admin_email IS NOT NULL
+      AND passcode_hash IS NOT NULL
   );
 $$;
 
 CREATE OR REPLACE FUNCTION public.verify_couple_admin_login(
   p_wedding_id TEXT DEFAULT 'wed-aur-001',
-  p_couple_names TEXT DEFAULT '',
+  p_email TEXT DEFAULT '',
   p_password TEXT DEFAULT ''
 )
 RETURNS BOOLEAN
@@ -250,30 +261,18 @@ SECURITY DEFINER
 SET search_path = public, extensions
 AS $$
 DECLARE
+  v_email TEXT;
   v_hash TEXT;
-  v_p1 TEXT;
-  v_p2 TEXT;
-  v_norm_input TEXT;
-  v_p1_first TEXT;
-  v_p2_first TEXT;
 BEGIN
-  SELECT passcode_hash INTO v_hash
+  SELECT admin_email, passcode_hash INTO v_email, v_hash
   FROM public.couple_admin_credentials
   WHERE wedding_id = p_wedding_id;
 
-  IF v_hash IS NULL THEN
+  IF v_email IS NULL OR v_hash IS NULL THEN
     RETURN FALSE;
   END IF;
 
-  SELECT partner1, partner2 INTO v_p1, v_p2
-  FROM public.weddings
-  WHERE id = p_wedding_id;
-
-  v_p1_first := lower(split_part(trim(coalesce(v_p1, 'Samson')), ' ', 1));
-  v_p2_first := lower(split_part(trim(coalesce(v_p2, 'Kevine')), ' ', 1));
-  v_norm_input := lower(coalesce(p_couple_names, ''));
-
-  IF position(v_p1_first in v_norm_input) = 0 OR position(v_p2_first in v_norm_input) = 0 THEN
+  IF lower(trim(v_email)) <> lower(trim(coalesce(p_email, ''))) THEN
     RETURN FALSE;
   END IF;
 
@@ -283,7 +282,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.claim_couple_admin_password(
   p_wedding_id TEXT DEFAULT 'wed-aur-001',
-  p_couple_names TEXT DEFAULT '',
+  p_email TEXT DEFAULT '',
   p_password TEXT DEFAULT ''
 )
 RETURNS BOOLEAN
@@ -292,34 +291,22 @@ SECURITY DEFINER
 SET search_path = public, extensions
 AS $$
 DECLARE
-  v_p1 TEXT;
-  v_p2 TEXT;
-  v_norm_input TEXT;
-  v_p1_first TEXT;
-  v_p2_first TEXT;
+  v_clean_email TEXT := lower(trim(coalesce(p_email, '')));
+  v_clean_pass TEXT := trim(coalesce(p_password, ''));
 BEGIN
-  IF length(trim(coalesce(p_password, ''))) < 4 THEN
+  IF v_clean_email !~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' OR length(v_clean_pass) < 4 THEN
     RETURN FALSE;
   END IF;
 
-  IF EXISTS (SELECT 1 FROM public.couple_admin_credentials WHERE wedding_id = p_wedding_id) THEN
+  IF EXISTS (
+    SELECT 1 FROM public.couple_admin_credentials
+    WHERE wedding_id = p_wedding_id AND admin_email IS NOT NULL
+  ) THEN
     RETURN FALSE;
   END IF;
 
-  SELECT partner1, partner2 INTO v_p1, v_p2
-  FROM public.weddings
-  WHERE id = p_wedding_id;
-
-  v_p1_first := lower(split_part(trim(coalesce(v_p1, 'Samson')), ' ', 1));
-  v_p2_first := lower(split_part(trim(coalesce(v_p2, 'Kevine')), ' ', 1));
-  v_norm_input := lower(coalesce(p_couple_names, ''));
-
-  IF position(v_p1_first in v_norm_input) = 0 OR position(v_p2_first in v_norm_input) = 0 THEN
-    RETURN FALSE;
-  END IF;
-
-  INSERT INTO public.couple_admin_credentials (wedding_id, passcode_hash)
-  VALUES (p_wedding_id, crypt(trim(p_password), gen_salt('bf')))
+  INSERT INTO public.couple_admin_credentials (wedding_id, admin_email, passcode_hash)
+  VALUES (p_wedding_id, v_clean_email, crypt(v_clean_pass, gen_salt('bf')))
   ON CONFLICT (wedding_id) DO NOTHING;
 
   RETURN TRUE;

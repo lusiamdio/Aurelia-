@@ -169,7 +169,7 @@ export async function getCoupleAuthStatus(): Promise<{
 }
 
 export async function signInCoupleAdmin(
-  coupleNames: string,
+  email: string,
   password: string
 ): Promise<AuthResult> {
   try {
@@ -177,7 +177,7 @@ export async function signInCoupleAdmin(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        coupleNames: coupleNames.trim(),
+        email: email.trim().toLowerCase(),
         password
       })
     });
@@ -200,7 +200,7 @@ export async function signInCoupleAdmin(
     return {
       authenticated: false,
       requiresSetup: Boolean(data.requiresSetup),
-      error: data.error || 'Invalid couple credentials or password.'
+      error: data.error || 'Invalid email or password.'
     };
   } catch {
     return {
@@ -211,7 +211,7 @@ export async function signInCoupleAdmin(
 }
 
 export async function claimCoupleAdminPasscode(
-  coupleNames: string,
+  email: string,
   password: string
 ): Promise<AuthResult> {
   try {
@@ -219,7 +219,7 @@ export async function claimCoupleAdminPasscode(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        coupleNames: coupleNames.trim(),
+        email: email.trim().toLowerCase(),
         password
       })
     });

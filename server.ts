@@ -75,6 +75,7 @@ interface ServerStore {
   songs: any[];
   deletedSongIds: string[];
   adminAuth?: {
+    claimedEmail?: string | null;
     claimedPasscodeHash?: string | null;
     sessionSigningKey?: string | null;
   };
@@ -127,18 +128,25 @@ const SESSION_SIGNING_KEY: string = (() => {
   return generated;
 })();
 
-// Optional first-run fallback passcode hash (persisted in .data/wedding_store.json when COUPLE_ADMIN_PASSCODE env var is unset)
+// Optional first-run fallback credentials (persisted in .data/wedding_store.json when env vars are unset)
+let claimedAdminEmail: string | null = readServerStore().adminAuth?.claimedEmail || null;
 let claimedAdminPasscodeHash: string | null =
   readServerStore().adminAuth?.claimedPasscodeHash || null;
 
-function setClaimedAdminPasscodeHash(hash: string): void {
+function setClaimedAdminCredentials(email: string, hash: string): void {
+  claimedAdminEmail = email.trim().toLowerCase();
   claimedAdminPasscodeHash = hash;
   const store = readServerStore();
   store.adminAuth = {
     ...(store.adminAuth || {}),
+    claimedEmail: claimedAdminEmail,
     claimedPasscodeHash: hash
   };
   writeServerStore(store);
+}
+
+function getConfiguredAdminEmail(): string {
+  return cleanEnvSecret(process.env.COUPLE_ADMIN_EMAIL).toLowerCase();
 }
 
 function getConfiguredAdminPasscode(): string {
@@ -166,6 +174,19 @@ function verifyPasscodeScrypt(passcode: string, storedHash: string): boolean {
   return crypto.timingSafeEqual(derived, storedBuf);
 }
 
+function verifySubmittedEmail(submittedEmail: string): boolean {
+  const normalized = submittedEmail.trim().toLowerCase();
+  if (!normalized) return false;
+  const configured = getConfiguredAdminEmail();
+  if (configured) {
+    return constantTimeMatch(normalized, configured);
+  }
+  if (claimedAdminEmail) {
+    return constantTimeMatch(normalized, claimedAdminEmail.trim().toLowerCase());
+  }
+  return false;
+}
+
 function verifySubmittedPasscode(submittedPassword: string): boolean {
   const configured = getConfiguredAdminPasscode();
   if (configured) {
@@ -175,58 +196,6 @@ function verifySubmittedPasscode(submittedPassword: string): boolean {
     return verifyPasscodeScrypt(submittedPassword.trim(), claimedAdminPasscodeHash);
   }
   return false;
-}
-
-let cachedCoupleFirstNames: { value: [string, string]; expiresAt: number } | null = null;
-
-function normalizeAlphaToken(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
-
-async function getAuthoritativeCoupleFirstNames(): Promise<[string, string]> {
-  if (cachedCoupleFirstNames && Date.now() < cachedCoupleFirstNames.expiresAt) {
-    return cachedCoupleFirstNames.value;
-  }
-
-  let p1 = 'Samson';
-  let p2 = 'Kevine';
-
-  const store = readServerStore();
-  const savedWedding = store.weddings['wed-aur-001']?.weddingPayload;
-  if (savedWedding?.partner1) p1 = String(savedWedding.partner1);
-  if (savedWedding?.partner2) p2 = String(savedWedding.partner2);
-
-  const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
-  if (dbClient) {
-    try {
-      const dbLookup = dbClient
-        .from('weddings')
-        .select('partner1, partner2')
-        .eq('slug', 'samson-kevine')
-        .maybeSingle();
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
-      const result: any = await Promise.race([dbLookup, timeoutPromise]);
-      if (result?.data?.partner1) p1 = String(result.data.partner1);
-      if (result?.data?.partner2) p2 = String(result.data.partner2);
-    } catch {
-      // use defaults / saved wedding names
-    }
-  }
-
-  const names: [string, string] = [
-    normalizeAlphaToken(p1.trim().split(/\s+/)[0] || p1),
-    normalizeAlphaToken(p2.trim().split(/\s+/)[0] || p2)
-  ];
-  cachedCoupleFirstNames = { value: names, expiresAt: Date.now() + 60_000 };
-  return names;
-}
-
-function matchesBothCoupleFirstNames(input: string, p1First: string, p2First: string): boolean {
-  const tokens = new Set((normalizeAlphaToken(input).match(/[a-z]+/g) || []));
-  return tokens.has(normalizeAlphaToken(p1First)) && tokens.has(normalizeAlphaToken(p2First));
 }
 
 function issueAdminBearerToken(coupleLabel: string): { token: string; expiresAt: number } {
@@ -315,7 +284,7 @@ async function checkSupabaseAdminCredentialExists(): Promise<boolean> {
 }
 
 async function verifyViaSupabaseAdminRpc(
-  coupleNames: string,
+  email: string,
   password: string
 ): Promise<'valid' | 'invalid' | 'unavailable'> {
   const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
@@ -323,7 +292,7 @@ async function verifyViaSupabaseAdminRpc(
   try {
     const { data, error } = await dbClient.rpc('verify_couple_admin_login', {
       p_wedding_id: 'wed-aur-001',
-      p_couple_names: coupleNames.trim(),
+      p_email: email.trim().toLowerCase(),
       p_password: password.trim()
     });
     if (error) return 'unavailable';
@@ -333,10 +302,10 @@ async function verifyViaSupabaseAdminRpc(
   }
 }
 
-// Check whether server admin passcode is configured or claimed
+// Check whether server admin credentials are configured or claimed
 app.get('/api/auth/status', async (_req, res) => {
-  const configured = Boolean(getConfiguredAdminPasscode());
-  const locallyClaimed = Boolean(claimedAdminPasscodeHash);
+  const configured = Boolean(getConfiguredAdminEmail() && getConfiguredAdminPasscode());
+  const locallyClaimed = Boolean(claimedAdminEmail && claimedAdminPasscodeHash);
   const dbConfigured = configured || locallyClaimed ? false : await checkSupabaseAdminCredentialExists();
   res.json({
     passcodeConfigured: configured || dbConfigured,
@@ -355,41 +324,36 @@ app.get('/api/auth/session', requireCoupleAdmin, (req, res) => {
   });
 });
 
-// One-time bootstrap claim (only active if COUPLE_ADMIN_PASSCODE is unset and not yet claimed)
+// One-time bootstrap claim (only active when env vars and DB credentials are unset)
 app.post('/api/auth/claim', async (req, res) => {
   const dbConfigured = await checkSupabaseAdminCredentialExists();
-  if (getConfiguredAdminPasscode() || claimedAdminPasscodeHash || dbConfigured) {
+  const envConfigured = Boolean(getConfiguredAdminEmail() && getConfiguredAdminPasscode());
+  const localClaimed = Boolean(claimedAdminEmail && claimedAdminPasscodeHash);
+  if (envConfigured || localClaimed || dbConfigured) {
     return res.status(403).json({
       authenticated: false,
       error: 'Admin access is already configured.'
     });
   }
 
-  const { coupleNames, password } = req.body || {};
-  if (!coupleNames || !password || String(password).trim().length < 4) {
+  const { email, password } = req.body || {};
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const trimmedPassword = String(password || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || trimmedPassword.length < 4) {
     return res.status(400).json({
       authenticated: false,
-      error: 'Valid couple credentials and password are required.'
+      error: 'Valid admin email and password are required.'
     });
   }
 
-  const [p1First, p2First] = await getAuthoritativeCoupleFirstNames();
-  if (!matchesBothCoupleFirstNames(String(coupleNames), p1First, p2First)) {
-    return res.status(401).json({
-      authenticated: false,
-      error: 'Invalid couple credentials.'
-    });
-  }
-
-  const trimmedPassword = String(password).trim();
-  setClaimedAdminPasscodeHash(hashPasscodeScrypt(trimmedPassword));
+  setClaimedAdminCredentials(normalizedEmail, hashPasscodeScrypt(trimmedPassword));
 
   const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
   if (dbClient) {
     try {
       await dbClient.rpc('claim_couple_admin_password', {
         p_wedding_id: 'wed-aur-001',
-        p_couple_names: String(coupleNames).trim(),
+        p_email: normalizedEmail,
         p_password: trimmedPassword
       });
     } catch {
@@ -397,7 +361,7 @@ app.post('/api/auth/claim', async (req, res) => {
     }
   }
 
-  const { token, expiresAt } = issueAdminBearerToken(`${p1First} & ${p2First}`);
+  const { token, expiresAt } = issueAdminBearerToken(normalizedEmail);
   return res.status(200).json({
     authenticated: true,
     role: 'couple_admin',
@@ -406,46 +370,48 @@ app.post('/api/auth/claim', async (req, res) => {
   });
 });
 
-// Couple Admin Sign In (Both First Names + Password verified server-side)
+// Couple Admin Sign In (Email + Password verified server-side)
 app.post('/api/auth/login', async (req, res) => {
-  const { coupleNames, password } = req.body || {};
-  if (!coupleNames || !password) {
+  const { email, password } = req.body || {};
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const trimmedPassword = String(password || '').trim();
+  if (!normalizedEmail || !trimmedPassword) {
     return res.status(400).json({
       authenticated: false,
-      error: 'Couple names and password are required.'
+      error: 'Email and password are required.'
     });
   }
 
-  const configured = getConfiguredAdminPasscode();
-  const [p1First, p2First] = await getAuthoritativeCoupleFirstNames();
-  const namesMatch = matchesBothCoupleFirstNames(String(coupleNames), p1First, p2First);
+  const envConfigured = Boolean(getConfiguredAdminEmail() && getConfiguredAdminPasscode());
+  const localClaimed = Boolean(claimedAdminEmail && claimedAdminPasscodeHash);
 
-  if (configured || claimedAdminPasscodeHash) {
-    const passwordMatch = verifySubmittedPasscode(String(password));
-    if (!namesMatch || !passwordMatch) {
+  if (envConfigured || localClaimed) {
+    const emailMatch = verifySubmittedEmail(normalizedEmail);
+    const passwordMatch = verifySubmittedPasscode(trimmedPassword);
+    if (!emailMatch || !passwordMatch) {
       return res.status(401).json({
         authenticated: false,
-        error: 'Invalid couple credentials or password.'
+        error: 'Invalid email or password.'
       });
     }
   } else {
-    const rpcStatus = await verifyViaSupabaseAdminRpc(String(coupleNames), String(password));
+    const rpcStatus = await verifyViaSupabaseAdminRpc(normalizedEmail, trimmedPassword);
     if (rpcStatus === 'unavailable') {
       return res.status(409).json({
         authenticated: false,
         requiresSetup: true,
-        error: 'Admin password has not been configured yet.'
+        error: 'Admin credentials have not been configured yet.'
       });
     }
-    if (rpcStatus === 'invalid' || !namesMatch) {
+    if (rpcStatus === 'invalid') {
       return res.status(401).json({
         authenticated: false,
-        error: 'Invalid couple credentials or password.'
+        error: 'Invalid email or password.'
       });
     }
   }
 
-  const { token, expiresAt } = issueAdminBearerToken(`${p1First} & ${p2First}`);
+  const { token, expiresAt } = issueAdminBearerToken(normalizedEmail);
   return res.status(200).json({
     authenticated: true,
     role: 'couple_admin',
@@ -829,7 +795,6 @@ app.put('/api/admin/wedding', requireCoupleAdmin, async (req, res) => {
     eventRows: Array.isArray(eventRows) ? eventRows : []
   };
   writeServerStore(store);
-  cachedCoupleFirstNames = null;
 
   if (supabaseAdmin && hasSupabaseAdminPrivilege) {
     const { error: wErr } = await supabaseAdmin
@@ -946,7 +911,6 @@ app.delete('/api/admin/erase/:weddingId', requireCoupleAdmin, async (req, res) =
   store.deletedSongIds = [];
   delete store.weddings[weddingId];
   writeServerStore(store);
-  cachedCoupleFirstNames = null;
 
   if (supabaseAdmin && hasSupabaseAdminPrivilege) {
     const { error: gErr } = await supabaseAdmin
