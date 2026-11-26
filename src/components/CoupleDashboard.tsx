@@ -32,7 +32,8 @@ import {
   Printer,
   Radio,
   Loader2,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 
 interface CoupleDashboardProps {
@@ -40,6 +41,7 @@ interface CoupleDashboardProps {
   guests: GuestInvitation[];
   onUpdateGuests: (guests: GuestInvitation[]) => void;
   onUpdateWedding?: (updated: WeddingData) => void;
+  onRefreshGuests?: () => Promise<void> | void;
   onClose: () => void;
   onOpenStudio: () => void;
   onDeleteMicrosite?: () => void;
@@ -50,11 +52,13 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
   guests,
   onUpdateGuests,
   onUpdateWedding,
+  onRefreshGuests,
   onClose,
   onOpenStudio,
   onDeleteMicrosite
 }) => {
   const [dashboardTab, setDashboardTab] = useState<'guests' | 'playlist' | 'scanner' | 'privacy'>('guests');
+  const [isRefreshingGuests, setIsRefreshingGuests] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'attending' | 'couple' | 'single' | 'pending' | 'declined'
@@ -503,7 +507,27 @@ export const CoupleDashboard: React.FC<CoupleDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {onRefreshGuests && (
+              <button
+                onClick={async () => {
+                  setIsRefreshingGuests(true);
+                  try {
+                    await onRefreshGuests();
+                  } finally {
+                    setIsRefreshingGuests(false);
+                  }
+                }}
+                disabled={isRefreshingGuests}
+                className="px-3.5 py-2 text-xs font-semibold uppercase tracking-wider bg-white shadow-xs rounded-xl hover:bg-[#FAF7F0] transition-colors flex items-center gap-1.5 text-[#292722]"
+                title="Refresh Guest Registry"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 text-[#8C6D45] ${isRefreshingGuests ? 'animate-spin' : ''}`}
+                />
+                Refresh
+              </button>
+            )}
             <button
               onClick={() => setShowAddGuestModal(true)}
               className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-[#292722] hover:bg-[#8C6D45] rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"

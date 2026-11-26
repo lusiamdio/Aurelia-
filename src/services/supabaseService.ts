@@ -642,3 +642,137 @@ export async function eraseWeddingDataFromSupabase(
     return { error: err?.message };
   }
 }
+
+export type AdminSyncTopic = 'guests' | 'songs' | 'wedding';
+
+export function subscribeToAdminRealTimeSync(
+  weddingId: string,
+  onSync: (topic: AdminSyncTopic) => void
+): () => void {
+  let isDisposed = false;
+  let controller: AbortController | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const connectStream = async () => {
+    if (isDisposed || !inMemoryAdminToken) return;
+
+    controller = new AbortController();
+    try {
+      const res = await fetch(
+        `/api/admin/guests/stream?weddingId=${encodeURIComponent(weddingId)}`,
+        {
+          headers: {
+            Accept: 'text/event-stream',
+            Authorization: `Bearer ${inMemoryAdminToken}`
+          },
+          cache: 'no-store',
+          signal: controller.signal
+        }
+      );
+
+      if (res.status === 401 || res.status === 403) {
+        return;
+      }
+
+      if (!res.ok || !res.body) {
+        throw new Error(`Stream status ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (!isDisposed) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+
+          let eventName = 'message';
+          const dataLines: string[] = [];
+          for (const line of frame.split(/\r?\n/)) {
+            if (line.startsWith('event:')) {
+              eventName = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              dataLines.push(line.slice(5).trim());
+            }
+          }
+
+          if (eventName === 'rsvp_sync' && dataLines.length > 0) {
+            try {
+              const parsed = JSON.parse(dataLines.join('\n'));
+              const topic: AdminSyncTopic =
+                parsed?.topic === 'songs' || parsed?.topic === 'wedding'
+                  ? parsed.topic
+                  : 'guests';
+              onSync(topic);
+            } catch {
+              onSync('guests');
+            }
+          }
+
+          boundary = buffer.indexOf('\n\n');
+        }
+      }
+    } catch {
+      // Reconnect below unless aborted/disposed
+    }
+
+    if (!isDisposed && inMemoryAdminToken) {
+      reconnectTimer = setTimeout(() => {
+        void connectStream();
+      }, 2500);
+    }
+  };
+
+  void connectStream();
+
+  // Attach Supabase Realtime postgres_changes listener if active
+  const rtChannel = supabase
+    ? supabase
+        .channel(`admin-rsvp-sync-${weddingId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'guest_invitations',
+            filter: `wedding_id=eq.${weddingId}`
+          },
+          () => onSync('guests')
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'song_requests',
+            filter: `wedding_id=eq.${weddingId}`
+          },
+          () => onSync('songs')
+        )
+        .subscribe()
+    : null;
+
+  // Lightweight visibility-aware fallback consistency check
+  const fallbackTimer = setInterval(() => {
+    if (!isDisposed && document.visibilityState === 'visible') {
+      onSync('guests');
+    }
+  }, 5000);
+
+  return () => {
+    isDisposed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    clearInterval(fallbackTimer);
+    if (controller) controller.abort();
+    if (rtChannel && supabase) {
+      void supabase.removeChannel(rtChannel);
+    }
+  };
+}
+

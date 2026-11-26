@@ -283,6 +283,43 @@ CREATE POLICY "admins_self_select" ON public.wedding_admins
   FOR SELECT TO authenticated
   USING (user_id = auth.uid());
 
+-- 6B. REAL-TIME REPLICATION FOR INSTANT ADMIN SYNC
+ALTER TABLE public.guest_invitations REPLICA IDENTITY FULL;
+ALTER TABLE public.song_requests REPLICA IDENTITY FULL;
+ALTER TABLE public.weddings REPLICA IDENTITY FULL;
+ALTER TABLE public.wedding_events REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'guest_invitations'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.guest_invitations;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'song_requests'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.song_requests;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'weddings'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.weddings;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'wedding_events'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.wedding_events;
+    END IF;
+  END IF;
+END
+$$;
+
 -- 7. SEED SAMSON & KEVINE WEDDING RECORD (IDEMPOTENT)
 INSERT INTO public.weddings (
   id, slug, custom_domain, partner1, partner2, display_date, raw_date, city, venue,

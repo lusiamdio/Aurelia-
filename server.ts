@@ -24,24 +24,47 @@ process.on('unhandledRejection', (reason) => {
 
 app.use(express.json());
 
-// Supabase Configuration (from environment variables — never hardcoded)
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabasePublishableKey =
-  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const supabaseServiceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+function cleanEnvSecret(value?: string): string {
+  return (value || '').trim().replace(/^["']|["']$/g, '').trim();
+}
 
-const supabaseServer =
-  supabaseUrl && (supabaseServiceRoleKey || supabasePublishableKey)
-    ? createClient(supabaseUrl, (supabaseServiceRoleKey || supabasePublishableKey)!, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+// Supabase Configuration (from environment variables — never hardcoded)
+const supabaseUrl = cleanEnvSecret(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+const supabasePublishableKey = cleanEnvSecret(
+  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY
+);
+const supabaseServiceRoleKey = cleanEnvSecret(
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY
+);
+
+const supabasePublic =
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
       })
     : null;
 
-const hasSupabaseAdminPrivilege = Boolean(supabaseUrl && supabaseServiceRoleKey);
+const supabaseAdmin =
+  supabaseUrl && supabaseServiceRoleKey
+    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      })
+    : null;
+
+let hasSupabaseAdminPrivilege = Boolean(supabaseAdmin);
+
+if (supabaseAdmin) {
+  void supabaseAdmin
+    .from('weddings')
+    .select('id')
+    .limit(1)
+    .then(({ error }) => {
+      if (error && /invalid api key|jwt/i.test(error.message)) {
+        hasSupabaseAdminPrivilege = false;
+        console.warn('Supabase service key rejected; running admin persistence with server store fallback.');
+      }
+    });
+}
 
 // In-memory session signing key (reads SESSION_SECRET if configured, otherwise generated securely in memory)
 const SESSION_SIGNING_KEY =
@@ -86,28 +109,44 @@ function verifySubmittedPasscode(submittedPassword: string): boolean {
   return false;
 }
 
+let cachedCoupleFirstNames: { value: [string, string]; expiresAt: number } | null = null;
+
 async function getAuthoritativeCoupleFirstNames(): Promise<[string, string]> {
+  if (cachedCoupleFirstNames && Date.now() < cachedCoupleFirstNames.expiresAt) {
+    return cachedCoupleFirstNames.value;
+  }
+
   let p1 = 'Samson';
   let p2 = 'Kevine';
 
-  if (supabaseServer) {
+  const store = readServerStore();
+  const savedWedding = store.weddings['wed-aur-001']?.weddingPayload;
+  if (savedWedding?.partner1) p1 = String(savedWedding.partner1);
+  if (savedWedding?.partner2) p2 = String(savedWedding.partner2);
+
+  const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
+  if (dbClient) {
     try {
-      const { data } = await supabaseServer
+      const dbLookup = dbClient
         .from('weddings')
         .select('partner1, partner2')
         .eq('slug', 'samson-kevine')
         .maybeSingle();
-      if (data?.partner1) p1 = String(data.partner1);
-      if (data?.partner2) p2 = String(data.partner2);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+      const result: any = await Promise.race([dbLookup, timeoutPromise]);
+      if (result?.data?.partner1) p1 = String(result.data.partner1);
+      if (result?.data?.partner2) p2 = String(result.data.partner2);
     } catch {
-      // use public wedding defaults
+      // use defaults / saved wedding names
     }
   }
 
-  return [
+  const names: [string, string] = [
     (p1.trim().split(/\s+/)[0] || p1).toLowerCase(),
     (p2.trim().split(/\s+/)[0] || p2).toLowerCase()
   ];
+  cachedCoupleFirstNames = { value: names, expiresAt: Date.now() + 60_000 };
+  return names;
 }
 
 function matchesBothCoupleFirstNames(input: string, p1First: string, p2First: string): boolean {
@@ -284,6 +323,28 @@ app.post('/api/auth/login', async (req, res) => {
 const DATA_DIR = path.resolve(__dirname, '.data');
 const STORE_FILE = path.resolve(DATA_DIR, 'wedding_store.json');
 
+type AdminSyncTopic = 'guests' | 'songs' | 'wedding';
+interface AdminStreamClient {
+  res: express.Response;
+  weddingId: string;
+}
+
+const adminStreamClients = new Set<AdminStreamClient>();
+
+function broadcastAdminSync(weddingId: string, topic: AdminSyncTopic): void {
+  const payload = JSON.stringify({ topic, weddingId, timestamp: Date.now() });
+  const frame = `event: rsvp_sync\ndata: ${payload}\n\n`;
+  for (const client of adminStreamClients) {
+    if (client.weddingId === weddingId) {
+      try {
+        client.res.write(frame);
+      } catch {
+        adminStreamClients.delete(client);
+      }
+    }
+  }
+}
+
 interface ServerStore {
   weddings: Record<string, { weddingPayload: any; eventRows: any[] }>;
   guests: any[];
@@ -383,18 +444,27 @@ app.post('/api/public/rsvp', async (req, res) => {
   }
   writeServerStore(store);
 
-  if (supabaseServer) {
+  if (hasSupabaseAdminPrivilege && supabaseAdmin) {
     try {
-      if (hasSupabaseAdminPrivilege) {
-        await supabaseServer.from('guest_invitations').upsert(guestRow, { onConflict: 'id' });
-      } else {
-        await supabaseServer.from('guest_invitations').insert(guestRow);
+      const { error } = await supabaseAdmin
+        .from('guest_invitations')
+        .upsert(guestRow, { onConflict: 'id' });
+      if (error && /invalid api key|jwt/i.test(error.message)) {
+        hasSupabaseAdminPrivilege = false;
+        if (supabasePublic) await supabasePublic.from('guest_invitations').insert(guestRow);
       }
+    } catch {
+      // ignore if schema not initialized yet
+    }
+  } else if (supabasePublic) {
+    try {
+      await supabasePublic.from('guest_invitations').insert(guestRow);
     } catch {
       // ignore if schema not initialized yet or duplicate
     }
   }
 
+  broadcastAdminSync(guestRow.wedding_id, 'guests');
   return res.status(200).json({ ok: true, id: guestRow.id });
 });
 
@@ -435,14 +505,20 @@ app.post('/api/public/songs', async (req, res) => {
   }
   writeServerStore(store);
 
-  if (supabaseServer) {
+  const songWriter = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
+  if (songWriter) {
     try {
-      await supabaseServer.from('song_requests').insert(songRow);
+      const { error } = await songWriter.from('song_requests').insert(songRow);
+      if (error && /invalid api key|jwt/i.test(error.message) && supabasePublic) {
+        hasSupabaseAdminPrivilege = false;
+        await supabasePublic.from('song_requests').insert(songRow);
+      }
     } catch {
       // ignore if schema not initialized yet
     }
   }
 
+  broadcastAdminSync(songRow.wedding_id, 'songs');
   return res.status(200).json({ ok: true, id: songRow.id });
 });
 
@@ -465,22 +541,55 @@ app.get('/api/public/wedding', (req, res) => {
 // PROTECTED SUPABASE ADMIN CRUD ROUTES (COUPLE ADMIN ONLY)
 // ============================================================================
 
+app.get('/api/admin/guests/stream', requireCoupleAdmin, (req, res) => {
+  const weddingId = String(req.query.weddingId || 'wed-aur-001');
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const client: AdminStreamClient = { res, weddingId };
+  adminStreamClients.add(client);
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ weddingId, timestamp: Date.now() })}\n\n`);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      clearInterval(heartbeat);
+      adminStreamClients.delete(client);
+    }
+  }, 25_000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    adminStreamClients.delete(client);
+  });
+});
+
 app.get('/api/admin/guests', requireCoupleAdmin, async (req, res) => {
   const weddingId = String(req.query.weddingId || 'wed-aur-001');
   const store = readServerStore();
   const localGuests = store.guests.filter((g) => (g.wedding_id || 'wed-aur-001') === weddingId);
 
-  if (!supabaseServer || !hasSupabaseAdminPrivilege) {
+  if (!supabaseAdmin || !hasSupabaseAdminPrivilege) {
     return res.json({ guests: localGuests });
   }
 
-  const { data, error } = await supabaseServer
+  const { data, error } = await supabaseAdmin
     .from('guest_invitations')
     .select('*')
     .eq('wedding_id', weddingId)
     .order('created_at', { ascending: false });
 
   if (error) {
+    if (/invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+      return res.json({ guests: localGuests });
+    }
     return res.json({ guests: localGuests, error: error.message });
   }
 
@@ -492,7 +601,7 @@ app.get('/api/admin/guests', requireCoupleAdmin, async (req, res) => {
     if (!dbMap.has(lg.id)) {
       dbMap.set(lg.id, lg);
       try {
-        await supabaseServer.from('guest_invitations').insert(lg);
+        await supabaseAdmin.from('guest_invitations').insert(lg);
       } catch {
         // ignore
       }
@@ -524,12 +633,26 @@ app.post('/api/admin/guests', requireCoupleAdmin, async (req, res) => {
   }
   writeServerStore(store);
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error } = await supabaseServer
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseAdmin
       .from('guest_invitations')
       .upsert(guestRow, { onConflict: 'id' });
-    if (error) return res.status(400).json({ synced: false, error: error.message });
+    if (error && /invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+      if (supabasePublic) {
+        await supabasePublic.from('guest_invitations').insert(guestRow);
+      }
+    } else if (error) {
+      return res.status(400).json({ synced: false, error: error.message });
+    }
+  } else if (supabasePublic) {
+    try {
+      await supabasePublic.from('guest_invitations').insert(guestRow);
+    } catch {
+      // ignore
+    }
   }
+  broadcastAdminSync(guestRow.wedding_id, 'guests');
   return res.json({ synced: true });
 });
 
@@ -549,29 +672,41 @@ app.patch('/api/admin/guests/:id', requireCoupleAdmin, async (req, res) => {
   }
   writeServerStore(store);
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error } = await supabaseServer
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseAdmin
       .from('guest_invitations')
       .update(guestRow)
       .eq('id', guestId);
-    if (error) return res.status(400).json({ synced: false, error: error.message });
+    if (error && /invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+    } else if (error) {
+      return res.status(400).json({ synced: false, error: error.message });
+    }
   }
+  broadcastAdminSync(guestRow.wedding_id, 'guests');
   return res.json({ synced: true });
 });
 
 app.delete('/api/admin/guests/:id', requireCoupleAdmin, async (req, res) => {
   const guestId = String(req.params.id || '');
   const store = readServerStore();
+  const deletedGuest = store.guests.find((g) => g.id === guestId);
+  const deletedWeddingId = String(deletedGuest?.wedding_id || 'wed-aur-001');
   store.guests = store.guests.filter((g) => g.id !== guestId);
   writeServerStore(store);
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error } = await supabaseServer
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseAdmin
       .from('guest_invitations')
       .delete()
       .eq('id', guestId);
-    if (error) return res.status(400).json({ synced: false, error: error.message });
+    if (error && /invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+    } else if (error) {
+      return res.status(400).json({ synced: false, error: error.message });
+    }
   }
+  broadcastAdminSync(deletedWeddingId, 'guests');
   return res.json({ synced: true });
 });
 
@@ -594,21 +729,28 @@ app.put('/api/admin/wedding', requireCoupleAdmin, async (req, res) => {
     eventRows: Array.isArray(eventRows) ? eventRows : []
   };
   writeServerStore(store);
+  cachedCoupleFirstNames = null;
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error: wErr } = await supabaseServer
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error: wErr } = await supabaseAdmin
       .from('weddings')
       .upsert(safeWeddingPayload, { onConflict: 'id' });
+    if (wErr && /invalid api key|jwt/i.test(wErr.message)) {
+      hasSupabaseAdminPrivilege = false;
+      broadcastAdminSync(safeWeddingPayload.id, 'wedding');
+      return res.json({ synced: true });
+    }
     if (wErr) return res.status(400).json({ synced: false, error: wErr.message });
 
     if (Array.isArray(eventRows) && eventRows.length > 0) {
-      const { error: eErr } = await supabaseServer
+      const { error: eErr } = await supabaseAdmin
         .from('wedding_events')
         .upsert(eventRows, { onConflict: 'id' });
       if (eErr) return res.status(400).json({ synced: false, error: eErr.message });
     }
   }
 
+  broadcastAdminSync(safeWeddingPayload.id, 'wedding');
   return res.json({ synced: true });
 });
 
@@ -627,10 +769,21 @@ app.post('/api/admin/songs', requireCoupleAdmin, async (req, res) => {
   }
   writeServerStore(store);
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error } = await supabaseServer.from('song_requests').insert(songRow);
-    if (error) return res.status(400).json({ synced: false, error: error.message });
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseAdmin.from('song_requests').insert(songRow);
+    if (error && /invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+    } else if (error) {
+      return res.status(400).json({ synced: false, error: error.message });
+    }
+  } else if (supabasePublic) {
+    try {
+      await supabasePublic.from('song_requests').insert(songRow);
+    } catch {
+      // ignore
+    }
   }
+  broadcastAdminSync(String(songRow.wedding_id || 'wed-aur-001'), 'songs');
   return res.json({ synced: true });
 });
 
@@ -638,36 +791,50 @@ app.patch('/api/admin/songs/:id', requireCoupleAdmin, async (req, res) => {
   const songId = String(req.params.id || '');
   const store = readServerStore();
   const idx = store.songs.findIndex((s) => s.id === songId);
+  let targetWeddingId = 'wed-aur-001';
   if (idx >= 0) {
     store.songs[idx] = { ...store.songs[idx], ...req.body };
+    targetWeddingId = String(store.songs[idx].wedding_id || 'wed-aur-001');
   } else {
     store.songs.unshift({ id: songId, wedding_id: 'wed-aur-001', ...req.body });
   }
   writeServerStore(store);
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error } = await supabaseServer
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseAdmin
       .from('song_requests')
       .update(req.body)
       .eq('id', songId);
-    if (error) return res.status(400).json({ synced: false, error: error.message });
+    if (error && /invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+    } else if (error) {
+      return res.status(400).json({ synced: false, error: error.message });
+    }
   }
+  broadcastAdminSync(targetWeddingId, 'songs');
   return res.json({ synced: true });
 });
 
 app.delete('/api/admin/songs/:id', requireCoupleAdmin, async (req, res) => {
   const songId = String(req.params.id || '');
   const store = readServerStore();
+  const existingSong = store.songs.find((s) => s.id === songId);
+  const targetWeddingId = String(existingSong?.wedding_id || 'wed-aur-001');
   store.songs = store.songs.filter((s) => s.id !== songId);
   if (!store.deletedSongIds.includes(songId)) {
     store.deletedSongIds.push(songId);
   }
   writeServerStore(store);
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error } = await supabaseServer.from('song_requests').delete().eq('id', songId);
-    if (error) return res.status(400).json({ synced: false, error: error.message });
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error } = await supabaseAdmin.from('song_requests').delete().eq('id', songId);
+    if (error && /invalid api key|jwt/i.test(error.message)) {
+      hasSupabaseAdminPrivilege = false;
+    } else if (error) {
+      return res.status(400).json({ synced: false, error: error.message });
+    }
   }
+  broadcastAdminSync(targetWeddingId, 'songs');
   return res.json({ synced: true });
 });
 
@@ -679,21 +846,30 @@ app.delete('/api/admin/erase/:weddingId', requireCoupleAdmin, async (req, res) =
   store.deletedSongIds = [];
   delete store.weddings[weddingId];
   writeServerStore(store);
+  cachedCoupleFirstNames = null;
 
-  if (supabaseServer && hasSupabaseAdminPrivilege) {
-    const { error: gErr } = await supabaseServer
+  if (supabaseAdmin && hasSupabaseAdminPrivilege) {
+    const { error: gErr } = await supabaseAdmin
       .from('guest_invitations')
       .delete()
       .eq('wedding_id', weddingId);
+    if (gErr && /invalid api key|jwt/i.test(gErr.message)) {
+      hasSupabaseAdminPrivilege = false;
+      broadcastAdminSync(weddingId, 'guests');
+      broadcastAdminSync(weddingId, 'wedding');
+      return res.json({ synced: true });
+    }
     if (gErr) return res.status(400).json({ synced: false, error: gErr.message });
 
-    const { error: sErr } = await supabaseServer
+    const { error: sErr } = await supabaseAdmin
       .from('song_requests')
       .delete()
       .eq('wedding_id', weddingId);
     if (sErr) return res.status(400).json({ synced: false, error: sErr.message });
   }
 
+  broadcastAdminSync(weddingId, 'guests');
+  broadcastAdminSync(weddingId, 'wedding');
   return res.json({ synced: true });
 });
 

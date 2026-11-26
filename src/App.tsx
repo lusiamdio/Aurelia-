@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WeddingData, GuestInvitation, InvitationStyle, SongRequest } from './types/wedding';
 import { INITIAL_WEDDING, INITIAL_GUESTS } from './data/mockWedding';
 import { Navbar } from './components/Navbar';
@@ -24,7 +24,8 @@ import {
   updateGuestInSupabase,
   deleteGuestFromSupabase,
   insertSongRequestToSupabase,
-  eraseWeddingDataFromSupabase
+  eraseWeddingDataFromSupabase,
+  subscribeToAdminRealTimeSync
 } from './services/supabaseService';
 
 export default function App() {
@@ -61,6 +62,8 @@ export default function App() {
   const [pendingTargetView, setPendingTargetView] = useState<'studio' | 'dashboard' | null>(null);
   const [emailPreviewGuest, setEmailPreviewGuest] = useState<GuestInvitation | null>(null);
   const [globalNotification, setGlobalNotification] = useState<string | null>(null);
+
+  const lastGuestMutationAtRef = useRef<number>(0);
 
   const showToast = useCallback((msg: string, duration = 3500) => {
     setGlobalNotification(msg);
@@ -111,21 +114,69 @@ export default function App() {
     };
   }, []);
 
+  const refreshAdminGuests = useCallback(
+    async (force = false) => {
+      if (!isCoupleAdmin) return;
+      if (!force && Date.now() - lastGuestMutationAtRef.current < 1200) {
+        return;
+      }
+      const { guests: dbGuests } = await fetchGuestsFromSupabase(wedding.id);
+      if (!dbGuests) return;
+      if (!force && Date.now() - lastGuestMutationAtRef.current < 1200) {
+        return;
+      }
+      setGuests(dbGuests);
+    },
+    [isCoupleAdmin, wedding.id]
+  );
+
   // Load latest guest roster whenever Couple Admin is unlocked or switching to Dashboard
   useEffect(() => {
     if (!isCoupleAdmin) return;
-    let isMounted = true;
-    const loadRoster = async () => {
-      const { guests: dbGuests } = await fetchGuestsFromSupabase(wedding.id);
-      if (isMounted && dbGuests) {
-        setGuests(dbGuests);
+    void refreshAdminGuests(true);
+  }, [isCoupleAdmin, currentView, refreshAdminGuests]);
+
+  // Subscribe to real-time RSVP, playlist, and wedding updates while authenticated as Couple Admin
+  useEffect(() => {
+    if (!isCoupleAdmin) return;
+
+    let isDisposed = false;
+    let isSyncingGuests = false;
+    let isSyncingWedding = false;
+
+    const unsubscribe = subscribeToAdminRealTimeSync(wedding.id, async (topic) => {
+      if (isDisposed) return;
+
+      if (topic === 'guests') {
+        if (isSyncingGuests || Date.now() - lastGuestMutationAtRef.current < 1200) return;
+        isSyncingGuests = true;
+        try {
+          const { guests: dbGuests } = await fetchGuestsFromSupabase(wedding.id);
+          if (!isDisposed && dbGuests && Date.now() - lastGuestMutationAtRef.current >= 1200) {
+            setGuests(dbGuests);
+          }
+        } finally {
+          isSyncingGuests = false;
+        }
+      } else if (topic === 'songs' || topic === 'wedding') {
+        if (isSyncingWedding) return;
+        isSyncingWedding = true;
+        try {
+          const { wedding: dbWedding } = await fetchWeddingFromSupabase(wedding.slug || 'samson-kevine');
+          if (!isDisposed && dbWedding) {
+            setWedding(dbWedding);
+          }
+        } finally {
+          isSyncingWedding = false;
+        }
       }
-    };
-    void loadRoster();
+    });
+
     return () => {
-      isMounted = false;
+      isDisposed = true;
+      unsubscribe();
     };
-  }, [isCoupleAdmin, currentView, wedding.id]);
+  }, [isCoupleAdmin, wedding.id, wedding.slug]);
 
   // Cache wedding config locally for instant initial render
   useEffect(() => {
@@ -225,6 +276,7 @@ export default function App() {
   };
 
   const handleGuestRegistered = async (newGuest: GuestInvitation) => {
+    lastGuestMutationAtRef.current = Date.now();
     setGuests((prev) => {
       const existingIdx = prev.findIndex((g) => g.id === newGuest.id);
       if (existingIdx >= 0) {
@@ -236,6 +288,7 @@ export default function App() {
     });
 
     const res = await insertGuestToSupabase(newGuest, wedding.id);
+    lastGuestMutationAtRef.current = Date.now();
     if (res.error) {
       console.warn('RSVP sync note:', res.error);
       showToast(`RSVP saved in session (${newGuest.fullName}).`, 3500);
@@ -245,15 +298,18 @@ export default function App() {
   };
 
   const handleUpdateGuestsFromDashboard = async (updatedGuests: GuestInvitation[]) => {
-    const prevMap = new Map(guests.map((g) => [g.id, g]));
+    lastGuestMutationAtRef.current = Date.now();
+    const prevGuestsSnapshot = guests;
+    const prevMap = new Map(prevGuestsSnapshot.map((g) => [g.id, g]));
     const nextMap = new Map(updatedGuests.map((g) => [g.id, g]));
     setGuests(updatedGuests);
 
     if (!isCoupleAdmin) return;
 
-    for (const prevGuest of guests) {
+    for (const prevGuest of prevGuestsSnapshot) {
       if (!nextMap.has(prevGuest.id)) {
         const res = await deleteGuestFromSupabase(prevGuest.id);
+        lastGuestMutationAtRef.current = Date.now();
         if (res.error) console.warn('Supabase guest delete error:', res.error);
       }
     }
@@ -262,9 +318,11 @@ export default function App() {
       const prevGuest = prevMap.get(nextGuest.id);
       if (!prevGuest) {
         const res = await insertGuestToSupabase(nextGuest, wedding.id);
+        lastGuestMutationAtRef.current = Date.now();
         if (res.error) console.warn('Supabase guest insert error:', res.error);
       } else if (JSON.stringify(prevGuest) !== JSON.stringify(nextGuest)) {
         const res = await updateGuestInSupabase(nextGuest, wedding.id);
+        lastGuestMutationAtRef.current = Date.now();
         if (res.error) console.warn('Supabase guest update error:', res.error);
       }
     }
@@ -401,6 +459,7 @@ export default function App() {
             guests={guests}
             onUpdateGuests={handleUpdateGuestsFromDashboard}
             onUpdateWedding={handleUpdateWedding}
+            onRefreshGuests={() => refreshAdminGuests(true)}
             onClose={() => setCurrentView('microsite')}
             onOpenStudio={() => handleNavigate('studio')}
             onDeleteMicrosite={handleDeleteMicrositeAndData}
