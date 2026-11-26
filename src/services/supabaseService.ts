@@ -154,7 +154,10 @@ export async function getCoupleAuthStatus(): Promise<{
 }> {
   try {
     const res = await fetch('/api/auth/status');
-    if (!res.ok) return { passcodeConfigured: true, requiresSetup: false };
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) {
+      return { passcodeConfigured: true, requiresSetup: false };
+    }
     const data = await res.json();
     return {
       passcodeConfigured: Boolean(data.passcodeConfigured),
@@ -169,51 +172,83 @@ export async function signInCoupleAdmin(
   coupleNames: string,
   password: string
 ): Promise<AuthResult> {
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      coupleNames: coupleNames.trim(),
-      password
-    })
-  });
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        coupleNames: coupleNames.trim(),
+        password
+      })
+    });
 
-  const data = await res.json().catch(() => ({}));
-  if (res.ok && data.authenticated && data.accessToken) {
-    inMemoryAdminToken = String(data.accessToken);
-    return { authenticated: true };
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json') || res.status === 404 || res.status === 405 || res.status >= 500) {
+      return {
+        authenticated: false,
+        error:
+          'Authentication backend is not reachable on this deployment. Start the server with npm start and verify environment settings.'
+      };
+    }
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.authenticated && data.accessToken) {
+      inMemoryAdminToken = String(data.accessToken);
+      return { authenticated: true };
+    }
+
+    return {
+      authenticated: false,
+      requiresSetup: Boolean(data.requiresSetup),
+      error: data.error || 'Invalid couple credentials or password.'
+    };
+  } catch {
+    return {
+      authenticated: false,
+      error: 'Unable to connect to authentication backend. Please try again.'
+    };
   }
-
-  return {
-    authenticated: false,
-    requiresSetup: Boolean(data.requiresSetup),
-    error: data.error || 'Invalid couple credentials or password.'
-  };
 }
 
 export async function claimCoupleAdminPasscode(
   coupleNames: string,
   password: string
 ): Promise<AuthResult> {
-  const res = await fetch('/api/auth/claim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      coupleNames: coupleNames.trim(),
-      password
-    })
-  });
+  try {
+    const res = await fetch('/api/auth/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        coupleNames: coupleNames.trim(),
+        password
+      })
+    });
 
-  const data = await res.json().catch(() => ({}));
-  if (res.ok && data.authenticated && data.accessToken) {
-    inMemoryAdminToken = String(data.accessToken);
-    return { authenticated: true };
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json') || res.status === 404 || res.status === 405 || res.status >= 500) {
+      return {
+        authenticated: false,
+        error:
+          'Authentication backend is not reachable on this deployment. Start the server with npm start.'
+      };
+    }
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.authenticated && data.accessToken) {
+      inMemoryAdminToken = String(data.accessToken);
+      return { authenticated: true };
+    }
+
+    return {
+      authenticated: false,
+      error: data.error || 'Unable to complete initial setup.'
+    };
+  } catch {
+    return {
+      authenticated: false,
+      error: 'Unable to connect to authentication backend. Please try again.'
+    };
   }
-
-  return {
-    authenticated: false,
-    error: data.error || 'Unable to complete initial setup.'
-  };
 }
 
 export async function signOutAdminFromSupabase(): Promise<void> {

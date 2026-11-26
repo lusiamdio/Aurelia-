@@ -66,15 +66,83 @@ if (supabaseAdmin) {
     });
 }
 
-// In-memory session signing key (reads SESSION_SECRET if configured, otherwise generated securely in memory)
-const SESSION_SIGNING_KEY =
-  (process.env.SESSION_SECRET || '').trim() || crypto.randomBytes(32).toString('hex');
+const DATA_DIR = path.resolve(__dirname, '.data');
+const STORE_FILE = path.resolve(DATA_DIR, 'wedding_store.json');
 
-// Optional first-run fallback passcode hash (used ONLY when COUPLE_ADMIN_PASSCODE env var is unset)
-let claimedAdminPasscodeHash: string | null = null;
+interface ServerStore {
+  weddings: Record<string, { weddingPayload: any; eventRows: any[] }>;
+  guests: any[];
+  songs: any[];
+  deletedSongIds: string[];
+  adminAuth?: {
+    claimedPasscodeHash?: string | null;
+    sessionSigningKey?: string | null;
+  };
+}
+
+function readServerStore(): ServerStore {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
+      return {
+        weddings: parsed.weddings && typeof parsed.weddings === 'object' ? parsed.weddings : {},
+        guests: Array.isArray(parsed.guests) ? parsed.guests : [],
+        songs: Array.isArray(parsed.songs) ? parsed.songs : [],
+        deletedSongIds: Array.isArray(parsed.deletedSongIds) ? parsed.deletedSongIds : [],
+        adminAuth:
+          parsed.adminAuth && typeof parsed.adminAuth === 'object' ? parsed.adminAuth : undefined
+      };
+    }
+  } catch {
+    // fallback to empty store
+  }
+  return { weddings: {}, guests: [], songs: [], deletedSongIds: [] };
+}
+
+function writeServerStore(store: ServerStore): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed writing server store:', err);
+  }
+}
+
+// Persistent session signing key (reads SESSION_SECRET if configured, otherwise generated once and stored)
+const SESSION_SIGNING_KEY: string = (() => {
+  const fromEnv = cleanEnvSecret(process.env.SESSION_SECRET);
+  if (fromEnv) return fromEnv;
+  const store = readServerStore();
+  if (store.adminAuth?.sessionSigningKey) {
+    return store.adminAuth.sessionSigningKey;
+  }
+  const generated = crypto.randomBytes(32).toString('hex');
+  store.adminAuth = {
+    ...(store.adminAuth || {}),
+    sessionSigningKey: generated
+  };
+  writeServerStore(store);
+  return generated;
+})();
+
+// Optional first-run fallback passcode hash (persisted in .data/wedding_store.json when COUPLE_ADMIN_PASSCODE env var is unset)
+let claimedAdminPasscodeHash: string | null =
+  readServerStore().adminAuth?.claimedPasscodeHash || null;
+
+function setClaimedAdminPasscodeHash(hash: string): void {
+  claimedAdminPasscodeHash = hash;
+  const store = readServerStore();
+  store.adminAuth = {
+    ...(store.adminAuth || {}),
+    claimedPasscodeHash: hash
+  };
+  writeServerStore(store);
+}
 
 function getConfiguredAdminPasscode(): string {
-  return (process.env.COUPLE_ADMIN_PASSCODE || '').trim();
+  return cleanEnvSecret(process.env.COUPLE_ADMIN_PASSCODE);
 }
 
 function constantTimeMatch(a: string, b: string): boolean {
@@ -111,6 +179,13 @@ function verifySubmittedPasscode(submittedPassword: string): boolean {
 
 let cachedCoupleFirstNames: { value: [string, string]; expiresAt: number } | null = null;
 
+function normalizeAlphaToken(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 async function getAuthoritativeCoupleFirstNames(): Promise<[string, string]> {
   if (cachedCoupleFirstNames && Date.now() < cachedCoupleFirstNames.expiresAt) {
     return cachedCoupleFirstNames.value;
@@ -142,16 +217,16 @@ async function getAuthoritativeCoupleFirstNames(): Promise<[string, string]> {
   }
 
   const names: [string, string] = [
-    (p1.trim().split(/\s+/)[0] || p1).toLowerCase(),
-    (p2.trim().split(/\s+/)[0] || p2).toLowerCase()
+    normalizeAlphaToken(p1.trim().split(/\s+/)[0] || p1),
+    normalizeAlphaToken(p2.trim().split(/\s+/)[0] || p2)
   ];
   cachedCoupleFirstNames = { value: names, expiresAt: Date.now() + 60_000 };
   return names;
 }
 
 function matchesBothCoupleFirstNames(input: string, p1First: string, p2First: string): boolean {
-  const tokens = new Set((input.toLowerCase().match(/[a-z]+/g) || []));
-  return tokens.has(p1First) && tokens.has(p2First);
+  const tokens = new Set((normalizeAlphaToken(input).match(/[a-z]+/g) || []));
+  return tokens.has(normalizeAlphaToken(p1First)) && tokens.has(normalizeAlphaToken(p2First));
 }
 
 function issueAdminBearerToken(coupleLabel: string): { token: string; expiresAt: number } {
@@ -222,13 +297,51 @@ function sanitizeCsvCell(value: unknown): string {
   return `"${safe}"`;
 }
 
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
+async function checkSupabaseAdminCredentialExists(): Promise<boolean> {
+  const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
+  if (!dbClient) return false;
+  try {
+    const rpcCall = dbClient.rpc('has_couple_admin_credentials', { p_wedding_id: 'wed-aur-001' });
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+    const result: any = await Promise.race([rpcCall, timeout]);
+    return Boolean(result && !result.error && result.data === true);
+  } catch {
+    return false;
+  }
+}
+
+async function verifyViaSupabaseAdminRpc(
+  coupleNames: string,
+  password: string
+): Promise<'valid' | 'invalid' | 'unavailable'> {
+  const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
+  if (!dbClient) return 'unavailable';
+  try {
+    const { data, error } = await dbClient.rpc('verify_couple_admin_login', {
+      p_wedding_id: 'wed-aur-001',
+      p_couple_names: coupleNames.trim(),
+      p_password: password.trim()
+    });
+    if (error) return 'unavailable';
+    return data === true ? 'valid' : 'invalid';
+  } catch {
+    return 'unavailable';
+  }
+}
+
 // Check whether server admin passcode is configured or claimed
-app.get('/api/auth/status', (_req, res) => {
+app.get('/api/auth/status', async (_req, res) => {
   const configured = Boolean(getConfiguredAdminPasscode());
+  const locallyClaimed = Boolean(claimedAdminPasscodeHash);
+  const dbConfigured = configured || locallyClaimed ? false : await checkSupabaseAdminCredentialExists();
   res.json({
-    passcodeConfigured: configured,
-    claimed: Boolean(claimedAdminPasscodeHash),
-    requiresSetup: !configured && !claimedAdminPasscodeHash
+    passcodeConfigured: configured || dbConfigured,
+    claimed: locallyClaimed,
+    requiresSetup: !configured && !locallyClaimed && !dbConfigured
   });
 });
 
@@ -244,7 +357,8 @@ app.get('/api/auth/session', requireCoupleAdmin, (req, res) => {
 
 // One-time bootstrap claim (only active if COUPLE_ADMIN_PASSCODE is unset and not yet claimed)
 app.post('/api/auth/claim', async (req, res) => {
-  if (getConfiguredAdminPasscode() || claimedAdminPasscodeHash) {
+  const dbConfigured = await checkSupabaseAdminCredentialExists();
+  if (getConfiguredAdminPasscode() || claimedAdminPasscodeHash || dbConfigured) {
     return res.status(403).json({
       authenticated: false,
       error: 'Admin access is already configured.'
@@ -267,7 +381,22 @@ app.post('/api/auth/claim', async (req, res) => {
     });
   }
 
-  claimedAdminPasscodeHash = hashPasscodeScrypt(String(password).trim());
+  const trimmedPassword = String(password).trim();
+  setClaimedAdminPasscodeHash(hashPasscodeScrypt(trimmedPassword));
+
+  const dbClient = (hasSupabaseAdminPrivilege ? supabaseAdmin : null) || supabasePublic;
+  if (dbClient) {
+    try {
+      await dbClient.rpc('claim_couple_admin_password', {
+        p_wedding_id: 'wed-aur-001',
+        p_couple_names: String(coupleNames).trim(),
+        p_password: trimmedPassword
+      });
+    } catch {
+      // optional SQL RPC
+    }
+  }
+
   const { token, expiresAt } = issueAdminBearerToken(`${p1First} & ${p2First}`);
   return res.status(200).json({
     authenticated: true,
@@ -288,23 +417,32 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const configured = getConfiguredAdminPasscode();
-  if (!configured && !claimedAdminPasscodeHash) {
-    return res.status(409).json({
-      authenticated: false,
-      requiresSetup: true,
-      error: 'Admin password has not been configured yet.'
-    });
-  }
-
   const [p1First, p2First] = await getAuthoritativeCoupleFirstNames();
   const namesMatch = matchesBothCoupleFirstNames(String(coupleNames), p1First, p2First);
-  const passwordMatch = verifySubmittedPasscode(String(password));
 
-  if (!namesMatch || !passwordMatch) {
-    return res.status(401).json({
-      authenticated: false,
-      error: 'Invalid couple credentials or password.'
-    });
+  if (configured || claimedAdminPasscodeHash) {
+    const passwordMatch = verifySubmittedPasscode(String(password));
+    if (!namesMatch || !passwordMatch) {
+      return res.status(401).json({
+        authenticated: false,
+        error: 'Invalid couple credentials or password.'
+      });
+    }
+  } else {
+    const rpcStatus = await verifyViaSupabaseAdminRpc(String(coupleNames), String(password));
+    if (rpcStatus === 'unavailable') {
+      return res.status(409).json({
+        authenticated: false,
+        requiresSetup: true,
+        error: 'Admin password has not been configured yet.'
+      });
+    }
+    if (rpcStatus === 'invalid' || !namesMatch) {
+      return res.status(401).json({
+        authenticated: false,
+        error: 'Invalid couple credentials or password.'
+      });
+    }
   }
 
   const { token, expiresAt } = issueAdminBearerToken(`${p1First} & ${p2First}`);
@@ -317,11 +455,8 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================================================
-// SERVER-SIDE PERSISTENT STORE + SUPABASE DUAL SYNC
+// SERVER-SIDE REAL-TIME HUB (SSE BROADCASTS)
 // ============================================================================
-
-const DATA_DIR = path.resolve(__dirname, '.data');
-const STORE_FILE = path.resolve(DATA_DIR, 'wedding_store.json');
 
 type AdminSyncTopic = 'guests' | 'songs' | 'wedding';
 interface AdminStreamClient {
@@ -342,41 +477,6 @@ function broadcastAdminSync(weddingId: string, topic: AdminSyncTopic): void {
         adminStreamClients.delete(client);
       }
     }
-  }
-}
-
-interface ServerStore {
-  weddings: Record<string, { weddingPayload: any; eventRows: any[] }>;
-  guests: any[];
-  songs: any[];
-  deletedSongIds: string[];
-}
-
-function readServerStore(): ServerStore {
-  try {
-    if (fs.existsSync(STORE_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
-      return {
-        weddings: parsed.weddings && typeof parsed.weddings === 'object' ? parsed.weddings : {},
-        guests: Array.isArray(parsed.guests) ? parsed.guests : [],
-        songs: Array.isArray(parsed.songs) ? parsed.songs : [],
-        deletedSongIds: Array.isArray(parsed.deletedSongIds) ? parsed.deletedSongIds : []
-      };
-    }
-  } catch {
-    // fallback to empty store
-  }
-  return { weddings: {}, guests: [], songs: [], deletedSongIds: [] };
-}
-
-function writeServerStore(store: ServerStore): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Failed writing server store:', err);
   }
 }
 

@@ -32,6 +32,7 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
   const [coupleNames, setCoupleNames] = useState('');
   const [password, setPassword] = useState('');
   const [requiresSetup, setRequiresSetup] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -40,11 +41,18 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
     if (!isOpen) return;
     let active = true;
     setError(null);
-    void getCoupleAuthStatus().then((status) => {
-      if (active) {
-        setRequiresSetup(status.requiresSetup);
-      }
-    });
+    setIsCheckingStatus(true);
+    void getCoupleAuthStatus()
+      .then((status) => {
+        if (active) {
+          setRequiresSetup(status.requiresSetup);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setIsCheckingStatus(false);
+        }
+      });
     return () => {
       active = false;
     };
@@ -66,13 +74,20 @@ export const CoupleAuthModal: React.FC<CoupleAuthModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const result = requiresSetup
+      let useSetupMode = requiresSetup;
+      if (isCheckingStatus) {
+        const status = await getCoupleAuthStatus();
+        useSetupMode = status.requiresSetup;
+        setRequiresSetup(status.requiresSetup);
+      }
+
+      const result = useSetupMode
         ? await claimCoupleAdminPasscode(coupleNames, password)
         : await signInCoupleAdmin(coupleNames, password);
 
       if (result.requiresSetup) {
         setRequiresSetup(true);
-        setError('Admin password is not configured yet. Please set a password below.');
+        setError('Initial admin setup is required on this deployment. Click "Set Password & Unlock" to save your password.');
         return;
       }
 

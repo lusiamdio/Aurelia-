@@ -215,6 +215,126 @@ $$;
 REVOKE ALL ON FUNCTION public.claim_couple_admin_access(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_couple_admin_access(TEXT) TO authenticated;
 
+-- 5B. COUPLE ADMIN CREDENTIAL VERIFICATION (PGCRYPTO HASHED, RLS-LOCKED)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS public.couple_admin_credentials (
+  wedding_id    TEXT PRIMARY KEY REFERENCES public.weddings(id) ON DELETE CASCADE,
+  passcode_hash TEXT NOT NULL,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.couple_admin_credentials ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.has_couple_admin_credentials(p_wedding_id TEXT DEFAULT 'wed-aur-001')
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.couple_admin_credentials WHERE wedding_id = p_wedding_id
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.verify_couple_admin_login(
+  p_wedding_id TEXT DEFAULT 'wed-aur-001',
+  p_couple_names TEXT DEFAULT '',
+  p_password TEXT DEFAULT ''
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_hash TEXT;
+  v_p1 TEXT;
+  v_p2 TEXT;
+  v_norm_input TEXT;
+  v_p1_first TEXT;
+  v_p2_first TEXT;
+BEGIN
+  SELECT passcode_hash INTO v_hash
+  FROM public.couple_admin_credentials
+  WHERE wedding_id = p_wedding_id;
+
+  IF v_hash IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT partner1, partner2 INTO v_p1, v_p2
+  FROM public.weddings
+  WHERE id = p_wedding_id;
+
+  v_p1_first := lower(split_part(trim(coalesce(v_p1, 'Samson')), ' ', 1));
+  v_p2_first := lower(split_part(trim(coalesce(v_p2, 'Kevine')), ' ', 1));
+  v_norm_input := lower(coalesce(p_couple_names, ''));
+
+  IF position(v_p1_first in v_norm_input) = 0 OR position(v_p2_first in v_norm_input) = 0 THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN crypt(trim(coalesce(p_password, '')), v_hash) = v_hash;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.claim_couple_admin_password(
+  p_wedding_id TEXT DEFAULT 'wed-aur-001',
+  p_couple_names TEXT DEFAULT '',
+  p_password TEXT DEFAULT ''
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_p1 TEXT;
+  v_p2 TEXT;
+  v_norm_input TEXT;
+  v_p1_first TEXT;
+  v_p2_first TEXT;
+BEGIN
+  IF length(trim(coalesce(p_password, ''))) < 4 THEN
+    RETURN FALSE;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.couple_admin_credentials WHERE wedding_id = p_wedding_id) THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT partner1, partner2 INTO v_p1, v_p2
+  FROM public.weddings
+  WHERE id = p_wedding_id;
+
+  v_p1_first := lower(split_part(trim(coalesce(v_p1, 'Samson')), ' ', 1));
+  v_p2_first := lower(split_part(trim(coalesce(v_p2, 'Kevine')), ' ', 1));
+  v_norm_input := lower(coalesce(p_couple_names, ''));
+
+  IF position(v_p1_first in v_norm_input) = 0 OR position(v_p2_first in v_norm_input) = 0 THEN
+    RETURN FALSE;
+  END IF;
+
+  INSERT INTO public.couple_admin_credentials (wedding_id, passcode_hash)
+  VALUES (p_wedding_id, crypt(trim(p_password), gen_salt('bf')))
+  ON CONFLICT (wedding_id) DO NOTHING;
+
+  RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.has_couple_admin_credentials(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.has_couple_admin_credentials(TEXT) TO anon, authenticated;
+
+REVOKE ALL ON FUNCTION public.verify_couple_admin_login(TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.verify_couple_admin_login(TEXT, TEXT, TEXT) TO anon, authenticated;
+
+REVOKE ALL ON FUNCTION public.claim_couple_admin_password(TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_couple_admin_password(TEXT, TEXT, TEXT) TO anon, authenticated;
+
 -- 6. ROW-LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.weddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wedding_events ENABLE ROW LEVEL SECURITY;
